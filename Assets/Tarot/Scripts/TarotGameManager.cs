@@ -39,6 +39,8 @@ namespace Tarot
             _uiManager.UpdateReadingResultUI("");
             _cardAnimator.Initialize(_resourceLoader.GetCardBackSprite());
             _uiManager.AddDrawButtonListener(OnDrawButtonClicked);
+            _uiManager.AddResetButtonListener(OnResetButtonClicked);
+            _uiManager.SetResetButtonInteractable(false);
         }
 
         /// <summary>
@@ -57,12 +59,14 @@ namespace Tarot
             string userConcern = _uiManager.GetUserConcern();
             if (string.IsNullOrWhiteSpace(userConcern))
             {
-                _uiManager.UpdateReadingResultUI(EmptyConcernMessage);
+                _uiManager.UpdateDefaultUIText(EmptyConcernMessage);
                 return;
             }
 
             _isProcessing = true;
             _uiManager.SetDrawButtonInteractable(false);
+            _uiManager.SetResetButtonInteractable(false);
+            _uiManager.HideInputUI();
 
             await ExecuteTarotReadingFlowAsync(userConcern);
 
@@ -93,6 +97,19 @@ namespace Tarot
             _uiManager.UpdateCardNameUI(drawnCard.NameKr, drawnCard.NameEn);
 
             await _uiManager.StreamReadingResultAsync(readingResult);
+            _uiManager.SetResetButtonInteractable(true);
+        }
+
+        /// <summary>
+        /// 점괘 표시가 끝난 뒤 리셋 버튼으로 입력 화면으로 돌아갑니다.
+        /// </summary>
+        private void OnResetButtonClicked()
+        {
+            if (_isProcessing) return;
+
+            _cardAnimator.HideCard();
+            _uiManager.ClearConcernInput();
+            _uiManager.ResetUI();
         }
 
         /// <summary>

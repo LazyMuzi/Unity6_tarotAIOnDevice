@@ -8,6 +8,13 @@ namespace Tarot.Core
     /// </summary>
     public class TarotPromptBuilder
     {
+        private const string UserPromptOutputFooter =
+            "\n\n" +
+            "[출력 형식 주의]\n" +
+            "- [생각]과 [점괘] 안에는 한글(한국어)만 쓰세요.\n" +
+            "- 영어 단어, 영문 문장, 카드 영문 이름(예: The Star), 로마자 표기는 넣지 마세요. 위에 영어가 보여도 답에는 한국어로만 풀어 쓰세요.\n" +
+            "- 한글 알파벳 섞기(예: fighting, OK)도 쓰지 마세요.\n";
+
         private const string SystemPromptMessage =
             "당신은 밤하늘 아래 작은 타로 가이드예요. 사용자의 '고민'과 뽑힌 '카드'를 읽고 귀엽고 부드럽게 점괘를 전해 줘요.\n\n" +
             "규칙:\n" +
@@ -16,7 +23,9 @@ namespace Tarot.Core
             "3. [점괘]에서는 귀엽고 부드러운 말투로 2~3문장만 적어요. 동화 속 친구나 따뜻한 안내자처럼, 부담 없이 위로와 응원을 담아 주세요.\n" +
             "4. [점괘] 말투는 부드러운 해요체로 통일해요. (~어요, ~예요, ~해봐요, ~거예요, ~까요? 등) 딱딱한 보고체나 명령조는 피해요.\n" +
             "5. '~냥', '~당', 과한 의성어나 유아 같은 말투는 피하고, 존댓말은 해요체 안에서만 써요. 반말은 [점괘]에 쓰지 마세요.\n" +
-            "6. 절대 영어를 쓰지 마세요. 전부 한국어로만 답하세요.\n\n" +
+            "6. 카드에 대해 말할 때 사람 높임말(예: 별 카드께서, 나타나셨, 내리셨)은 쓰지 마요. 카드는 자연스럽게 「별 카드가 나왔어요」「은둔자 카드예요」「세계 카드가 나왔어요」처럼 표현해요.\n" +
+            "7. 언어: [생각]·[점괘] 모두 한국어만 사용하세요. 영문·로마자·라틴 문자를 섞지 마세요. (예: The Star, Strength, OK, cheer up 금지) 카드는 항상 한글 이름으로만 부르세요.\n" +
+            "8. 위 규칙을 어기면 답변이 잘못된 것으로 간주합니다.\n\n" +
             "[예시1]\n" +
             "고민: 오늘 저녁 메뉴 추천해줘\n" +
             "카드: 은둔자 (자기 성찰, 고독, 내면의 탐구, 지혜)\n" +
@@ -48,11 +57,13 @@ namespace Tarot.Core
         /// <returns>완성된 사용자 프롬프트 문자열</returns>
         public string BuildUserPrompt(string userConcern, TarotCardData drawnCard)
         {
-            string prompt = 
+            string prompt =
                 $"고민: {userConcern}\n" +
-                $"카드: {drawnCard.NameKr} ({drawnCard.Keywords})\n" +
+                $"카드(한글 이름만 출력에 사용): {drawnCard.NameKr}\n" +
+                $"참고 키워드: {drawnCard.Keywords}\n" +
                 $"카드 의미: {drawnCard.Meaning}\n" +
-                $"[생각]";
+                UserPromptOutputFooter +
+                "[생각]";
 
             return prompt;
         }

@@ -31,10 +31,14 @@ namespace Tarot.UI
 
         [Header("Input UI")]
         [Tooltip("사용자가 고민을 입력하는 필드")]
+        [SerializeField] private GameObject _inputUiRoot;
         [SerializeField] private TMP_InputField _concernInputField;
         
         [Tooltip("타로 카드 뽑기를 실행하는 버튼")]
         [SerializeField] private Button _drawCardButton;
+
+        [Tooltip("점괘 스트리밍이 끝난 뒤 입력 화면으로 돌아갈 리셋 버튼")]
+        [SerializeField] private Button _resetButton;
 
         [Header("Card UI")]
         [Tooltip("CardNameText·CardDisplay 등 카드 관련 UI의 부모(CardUIRoot). 지정 시 이 오브젝트로 표시/숨김을 묶습니다.")]
@@ -47,9 +51,20 @@ namespace Tarot.UI
         [Tooltip("AI가 생성한 타로 리딩 결과를 스트리밍하여 보여줄 텍스트")]
         [SerializeField] private TextMeshProUGUI _readingResultText;
 
+        [Tooltip("점괘 영역 전체(ScrollRect 루트). 비우면 ReadingResultText 오브젝트만 켜고 끕니다.")]
+        [SerializeField] private GameObject _readingResultAreaRoot;
+
+        [Tooltip("점괘 ScrollRect(선택). 긴 글 스크롤과 레이아웃 갱신에 사용합니다.")]
+        [SerializeField] private ScrollRect _readingResultScrollRect;
+
+        [Tooltip("ScrollRect의 Content RectTransform(선택). 텍스트 높이 재계산에 사용합니다.")]
+        [SerializeField] private RectTransform _readingResultScrollContent;
+
         [Header("Streaming Settings")]
         [Tooltip("텍스트 스트리밍 시 글자당 딜레이(초)")]
         [SerializeField] private float _charDelay = 0.03f;
+
+        private const int StreamingLayoutRefreshCharInterval = 16;
 
         private CancellationTokenSource _streamingCts;
         private string _cachedWelcomeDefaultText;
@@ -69,6 +84,7 @@ namespace Tarot.UI
                 _gameplayUiRoot.SetActive(true);
 
             SetCoreGameplayWidgetsVisible(false);
+            SetResetButtonInteractable(false);
             HideCardUiArea();
             UpdateDefaultUIText(EnginePreparingMessage);
         }
@@ -101,8 +117,11 @@ namespace Tarot.UI
                 _concernInputField.gameObject.SetActive(visible);
             if (_drawCardButton != null)
                 _drawCardButton.gameObject.SetActive(visible);
-            if (_readingResultText != null)
-                _readingResultText.gameObject.SetActive(visible);
+            GameObject readingArea = _readingResultAreaRoot != null
+                ? _readingResultAreaRoot
+                : _readingResultText != null ? _readingResultText.gameObject : null;
+            if (readingArea != null)
+                readingArea.SetActive(visible);
         }
 
         /// <summary>
@@ -140,6 +159,21 @@ namespace Tarot.UI
                 _cardNameText.gameObject.SetActive(false);
         }
 
+        public void HideInputUI()
+        {
+            if (_inputUiRoot != null)
+                _inputUiRoot.SetActive(false);
+        }
+
+        /// <summary>
+        /// 고민 입력 영역(InputUIRoot)을 다시 표시합니다.
+        /// </summary>
+        public void ShowInputUI()
+        {
+            if (_inputUiRoot != null)
+                _inputUiRoot.SetActive(true);
+        }
+
         /// <summary>
         /// 고민 입력창의 내용을 반환합니다.
         /// </summary>
@@ -155,6 +189,33 @@ namespace Tarot.UI
         {
             if (action != null)
                 _drawCardButton?.onClick.AddListener(action);
+        }
+
+        /// <summary>
+        /// 리셋 버튼 클릭 시 실행될 이벤트를 등록합니다.
+        /// </summary>
+        public void AddResetButtonListener(UnityAction action)
+        {
+            if (action != null)
+                _resetButton?.onClick.AddListener(action);
+        }
+
+        /// <summary>
+        /// 리셋 버튼 입력 가능 여부 (점괘가 모두 표시된 뒤에만 true 권장).
+        /// </summary>
+        public void SetResetButtonInteractable(bool interactable)
+        {
+            if (_resetButton != null)
+                _resetButton.gameObject.SetActive(interactable);
+        }
+
+        /// <summary>
+        /// 고민 입력 필드를 비웁니다.
+        /// </summary>
+        public void ClearConcernInput()
+        {
+            if (_concernInputField != null)
+                _concernInputField.text = string.Empty;
         }
 
         /// <summary>
@@ -193,6 +254,7 @@ namespace Tarot.UI
         {
             if (_readingResultText != null)
                 _readingResultText.text = resultText;
+            RefreshReadingResultScrollLayout(string.IsNullOrEmpty(resultText));
         }
 
         /// <summary>
@@ -207,6 +269,8 @@ namespace Tarot.UI
             if (_readingResultText == null) return;
 
             _readingResultText.text = string.Empty;
+            if (_readingResultScrollRect != null)
+                _readingResultScrollRect.verticalNormalizedPosition = 1f;
             int delayMs = Mathf.Max(1, (int)(_charDelay * 1000));
 
             try
@@ -215,6 +279,8 @@ namespace Tarot.UI
                 {
                     token.ThrowIfCancellationRequested();
                     _readingResultText.text = fullText.Substring(0, i + 1);
+                    if ((i + 1) % StreamingLayoutRefreshCharInterval == 0)
+                        RefreshReadingResultScrollLayout(false);
                     await Task.Delay(delayMs, token);
                 }
             }
@@ -224,6 +290,26 @@ namespace Tarot.UI
             }
 
             _readingResultText.text = fullText;
+            RefreshReadingResultScrollLayout(false);
+        }
+
+        /// <summary>
+        /// ScrollRect·ContentSizeFitter 기준으로 점괘 텍스트 높이를 다시 계산합니다.
+        /// </summary>
+        /// <param name="scrollToTop">true이면 스크롤을 맨 위(점괘 시작)로 맞춥니다.</param>
+        private void RefreshReadingResultScrollLayout(bool scrollToTop)
+        {
+            RectTransform content = _readingResultScrollContent;
+            if (content == null && _readingResultText != null)
+                content = _readingResultText.rectTransform;
+
+            if (content != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+
+            Canvas.ForceUpdateCanvases();
+
+            if (scrollToTop && _readingResultScrollRect != null)
+                _readingResultScrollRect.verticalNormalizedPosition = 1f;
         }
 
         /// <summary>
@@ -277,7 +363,10 @@ namespace Tarot.UI
         {
             CancelStreaming();
 
+            ShowInputUI();
             SetCoreGameplayWidgetsVisible(true);
+            SetDrawButtonInteractable(true);
+            SetResetButtonInteractable(false);
 
             if (_defaultUIText != null)
             {
