@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 using Tarot.Core;
@@ -17,6 +18,10 @@ namespace Tarot
         private const string EmptyConcernMessage = "먼저 고민거리를 입력해 주세요!";
         private const string ReadingParseFailedMessage = "카드의 메시지를 해석하지 못했습니다. 다시 시도해 주세요.";
         private const string ReadingSectionTag = "[점괘]";
+
+        private static readonly Regex SymbolAndEmojiPattern = new Regex(
+            @"[\p{Cs}\p{So}\p{Cf}]",
+            RegexOptions.Compiled);
 
         [Header("Managers")]
         [SerializeField] private TarotAIManager _aiManager;
@@ -133,9 +138,30 @@ namespace Tarot
             if (string.IsNullOrWhiteSpace(result))
                 return ReadingParseFailedMessage;
 
+            result = SanitizeReadingText(result);
             result = result.Replace(". ", ".\n");
 
             return result;
+        }
+
+        /// <summary>
+        /// 모델이 규칙을 무시하고 섞어 넣는 마크다운·이모지·특수문자를 제거합니다.
+        /// \p{Cs}(서로게이트)·\p{So}(기호)·\p{Cf}(ZWJ 등 포맷) 유니코드 카테고리로 필터링합니다.
+        /// </summary>
+        private static string SanitizeReadingText(string text)
+        {
+            text = text.Replace("*", "");
+            text = text.Replace("#", "");
+            text = text.Replace("_", "");
+            text = text.Replace("~", "");
+            text = text.Replace("`", "");
+
+            text = SymbolAndEmojiPattern.Replace(text, "");
+
+            while (text.Contains("  "))
+                text = text.Replace("  ", " ");
+
+            return text.Trim();
         }
     }
 }
