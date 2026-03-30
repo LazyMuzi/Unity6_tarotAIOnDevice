@@ -9,6 +9,26 @@
       },
       "hash": "306f69a1e4434192ec0ac768531451b14bc3fd6b"
     },
+    "com.annulusgames.lit-motion": {
+      "version": "https://github.com/annulusgames/LitMotion.git?path=src/LitMotion/Assets/LitMotion",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.burst": "1.6.0",
+        "com.unity.collections": "1.5.1",
+        "com.unity.mathematics": "1.0.1"
+      },
+      "hash": "6cae9f18a49de0259904268ca76cf12cb89d1fc5"
+    },
+    "com.annulusgames.lit-motion.animation": {
+      "version": "https://github.com/annulusgames/LitMotion.git?path=src/LitMotion/Assets/LitMotion.Animation",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.annulusgames.lit-motion": "2.0.0"
+      },
+      "hash": "6cae9f18a49de0259904268ca76cf12cb89d1fc5"
+    },
     "com.boxqkrtm.ide.cursor": {
       "version": "git@github.com:boxqkrtm/com.unity.ide.cursor.git",
       "depth": 0,
@@ -17,6 +37,13 @@
         "com.unity.test-framework": "1.1.9"
       },
       "hash": "fd8ff1fb700caf062eb5cce364c1d0a85f99ebe6"
+    },
+    "com.github-glitchenzo.nugetforunity": {
+      "version": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "c2af83c9d4f8cdaada9d4a0e94de2f195d8e1d01"
     },
     "com.unity.2d.animation": {
       "version": "14.0.3",
@@ -119,7 +146,7 @@
     },
     "com.unity.burst": {
       "version": "1.8.28",
-      "depth": 2,
+      "depth": 1,
       "source": "registry",
       "dependencies": {
         "com.unity.mathematics": "1.2.1",

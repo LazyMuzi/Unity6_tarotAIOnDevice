@@ -1,0 +1,897 @@
+fileFormatVersion: 2
+guid: 792c57e327a884fffa9c15f2d7885420
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -8361663901328429513
+    second: nanobanana_generate_1-Photoroom_0
+  - first:
+      213: -5407365791885967275
+    second: nanobanana_generate_1-Photoroom_1
+  - first:
+      213: -492461150834419086
+    second: nanobanana_generate_1-Photoroom_2
+  - first:
+      213: -5799415562716415801
+    second: nanobanana_generate_1-Photoroom_3
+  - first:
+      213: -8240916604691331888
+    second: nanobanana_generate_1-Photoroom_4
+  - first:
+      213: -5650974539976241833
+    second: nanobanana_generate_1-Photoroom_5
+  - first:
+      213: 864925670764006191
+    second: nanobanana_generate_1-Photoroom_6
+  - first:
+      213: -725180223193014812
+    second: nanobanana_generate_1-Photoroom_7
+  - first:
+      213: -6468320227226669113
+    second: nanobanana_generate_1-Photoroom_8
+  - first:
+      213: 6133737349219694133
+    second: nanobanana_generate_1-Photoroom_9
+  - first:
+      213: -7738531378307946714
+    second: nanobanana_generate_1-Photoroom_10
+  - first:
+      213: -8875786532258926259
+    second: nanobanana_generate_1-Photoroom_11
+  - first:
+      213: -3902268970529554036
+    second: nanobanana_generate_1-Photoroom_12
+  - first:
+      213: 4791724258610270418
+    second: nanobanana_generate_1-Photoroom_13
+  - first:
+      213: -7152405714914475407
+    second: nanobanana_generate_1-Photoroom_14
+  - first:
+      213: -5983634930775002406
+    second: nanobanana_generate_1-Photoroom_15
+  - first:
+      213: 6384863367797153620
+    second: nanobanana_generate_1-Photoroom_16
+  - first:
+      213: 4944237253118450602
+    second: nanobanana_generate_1-Photoroom_17
+  - first:
+      213: -6837859583814070026
+    second: nanobanana_generate_1-Photoroom_18
+  - first:
+      213: -1129130318218249820
+    second: nanobanana_generate_1-Photoroom_19
+  - first:
+      213: -9163357122876552474
+    second: nanobanana_generate_1-Photoroom_20
+  - first:
+      213: -5377724864572268978
+    second: nanobanana_generate_1-Photoroom_21
+  - first:
+      213: -4559647431123716575
+    second: nanobanana_generate_1-Photoroom_22
+  - first:
+      213: -6158460578738863623
+    second: nanobanana_generate_1-Photoroom_23
+  - first:
+      213: -5184896119113371898
+    second: nanobanana_generate_1-Photoroom_24
+  - first:
+      213: -2263879931362028965
+    second: nanobanana_generate_1-Photoroom_25
+  - first:
+      213: 8605238769087389798
+    second: nanobanana_generate_1-Photoroom_26
+  - first:
+      213: -8189107529445556481
+    second: nanobanana_generate_1-Photoroom_27
+  - first:
+      213: -8576366822426700228
+    second: nanobanana_generate_1-Photoroom_28
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_0
+      rect:
+        serializedVersion: 2
+        x: 94
+        y: 1072
+        width: 354
+        height: 115
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 73eac16dbf665fb80800000000000000
+      internalID: -8361663901328429513
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_1
+      rect:
+        serializedVersion: 2
+        x: 509
+        y: 923
+        width: 262
+        height: 256
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 550c904367d25f4b0800000000000000
+      internalID: -5407365791885967275
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_2
+      rect:
+        serializedVersion: 2
+        x: 824
+        y: 1022
+        width: 179
+        height: 164
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 27a95d6413d6a29f0800000000000000
+      internalID: -492461150834419086
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_3
+      rect:
+        serializedVersion: 2
+        x: 1049
+        y: 1052
+        width: 135
+        height: 134
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7c87a67b546548fa0800000000000000
+      internalID: -5799415562716415801
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_4
+      rect:
+        serializedVersion: 2
+        x: 184
+        y: 923
+        width: 176
+        height: 138
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0d441c1a20262ad80800000000000000
+      internalID: -8240916604691331888
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_5
+      rect:
+        serializedVersion: 2
+        x: 905
+        y: 843
+        width: 89
+        height: 92
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 75d80f59894b391b0800000000000000
+      internalID: -5650974539976241833
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_6
+      rect:
+        serializedVersion: 2
+        x: 1051
+        y: 924
+        width: 35
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2b4103a055d00c00800000000000000
+      internalID: 864925670764006191
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_7
+      rect:
+        serializedVersion: 2
+        x: 1092
+        y: 924
+        width: 94
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4ed117edd64afe5f0800000000000000
+      internalID: -725180223193014812
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_8
+      rect:
+        serializedVersion: 2
+        x: 99
+        y: 814
+        width: 360
+        height: 96
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7cf2ea22609eb36a0800000000000000
+      internalID: -6468320227226669113
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_9
+      rect:
+        serializedVersion: 2
+        x: 568
+        y: 819
+        width: 119
+        height: 101
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 53639c50f996f1550800000000000000
+      internalID: 6133737349219694133
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_10
+      rect:
+        serializedVersion: 2
+        x: 738
+        y: 820
+        width: 118
+        height: 101
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 627adb046b63b9490800000000000000
+      internalID: -7738531378307946714
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_11
+      rect:
+        serializedVersion: 2
+        x: 1051
+        y: 881
+        width: 35
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d41b282cc2fd2d480800000000000000
+      internalID: -8875786532258926259
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_12
+      rect:
+        serializedVersion: 2
+        x: 1092
+        y: 881
+        width: 94
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c818e81eb0b58d9c0800000000000000
+      internalID: -3902268970529554036
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_13
+      rect:
+        serializedVersion: 2
+        x: 901
+        y: 819
+        width: 96
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2d0561853df9f7240800000000000000
+      internalID: 4791724258610270418
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_14
+      rect:
+        serializedVersion: 2
+        x: 1051
+        y: 839
+        width: 35
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1728c09b5ec8dbc90800000000000000
+      internalID: -7152405714914475407
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_15
+      rect:
+        serializedVersion: 2
+        x: 1092
+        y: 839
+        width: 94
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ad2798dabbbd5fca0800000000000000
+      internalID: -5983634930775002406
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_16
+      rect:
+        serializedVersion: 2
+        x: 108
+        y: 602
+        width: 328
+        height: 129
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 45f14f097679b9850800000000000000
+      internalID: 6384863367797153620
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_17
+      rect:
+        serializedVersion: 2
+        x: 539
+        y: 565
+        width: 202
+        height: 184
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aabd06506957d9440800000000000000
+      internalID: 4944237253118450602
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_18
+      rect:
+        serializedVersion: 2
+        x: 820
+        y: 595
+        width: 139
+        height: 143
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6f013c2efea0b11a0800000000000000
+      internalID: -6837859583814070026
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_19
+      rect:
+        serializedVersion: 2
+        x: 1034
+        y: 595
+        width: 141
+        height: 142
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4a93a7d35f58450f0800000000000000
+      internalID: -1129130318218249820
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_20
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 401
+        width: 134
+        height: 136
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6eac5ec0f3735d080800000000000000
+      internalID: -9163357122876552474
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_21
+      rect:
+        serializedVersion: 2
+        x: 301
+        y: 401
+        width: 134
+        height: 135
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e4e52636abb7e55b0800000000000000
+      internalID: -5377724864572268978
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_22
+      rect:
+        serializedVersion: 2
+        x: 475
+        y: 399
+        width: 551
+        height: 107
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 12639d6c1d0e8b0c0800000000000000
+      internalID: -4559647431123716575
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_23
+      rect:
+        serializedVersion: 2
+        x: 1074
+        y: 398
+        width: 95
+        height: 144
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9f106098bb0c88aa0800000000000000
+      internalID: -6158460578738863623
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_24
+      rect:
+        serializedVersion: 2
+        x: 105
+        y: 112
+        width: 184
+        height: 183
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 60f22fe437c8b08b0800000000000000
+      internalID: -5184896119113371898
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_25
+      rect:
+        serializedVersion: 2
+        x: 345
+        y: 115
+        width: 180
+        height: 181
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b52d70d62351590e0800000000000000
+      internalID: -2263879931362028965
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_26
+      rect:
+        serializedVersion: 2
+        x: 591
+        y: 125
+        width: 157
+        height: 171
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 660afd66113fb6770800000000000000
+      internalID: 8605238769087389798
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_27
+      rect:
+        serializedVersion: 2
+        x: 807
+        y: 129
+        width: 178
+        height: 166
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ffebbe7f6127a5e80800000000000000
+      internalID: -8189107529445556481
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: nanobanana_generate_1-Photoroom_28
+      rect:
+        serializedVersion: 2
+        x: 1020
+        y: 117
+        width: 175
+        height: 183
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c369fc580df9af880800000000000000
+      internalID: -8576366822426700228
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      nanobanana_generate_1-Photoroom_0: -8361663901328429513
+      nanobanana_generate_1-Photoroom_1: -5407365791885967275
+      nanobanana_generate_1-Photoroom_10: -7738531378307946714
+      nanobanana_generate_1-Photoroom_11: -8875786532258926259
+      nanobanana_generate_1-Photoroom_12: -3902268970529554036
+      nanobanana_generate_1-Photoroom_13: 4791724258610270418
+      nanobanana_generate_1-Photoroom_14: -7152405714914475407
+      nanobanana_generate_1-Photoroom_15: -5983634930775002406
+      nanobanana_generate_1-Photoroom_16: 6384863367797153620
+      nanobanana_generate_1-Photoroom_17: 4944237253118450602
+      nanobanana_generate_1-Photoroom_18: -6837859583814070026
+      nanobanana_generate_1-Photoroom_19: -1129130318218249820
+      nanobanana_generate_1-Photoroom_2: -492461150834419086
+      nanobanana_generate_1-Photoroom_20: -9163357122876552474
+      nanobanana_generate_1-Photoroom_21: -5377724864572268978
+      nanobanana_generate_1-Photoroom_22: -4559647431123716575
+      nanobanana_generate_1-Photoroom_23: -6158460578738863623
+      nanobanana_generate_1-Photoroom_24: -5184896119113371898
+      nanobanana_generate_1-Photoroom_25: -2263879931362028965
+      nanobanana_generate_1-Photoroom_26: 8605238769087389798
+      nanobanana_generate_1-Photoroom_27: -8189107529445556481
+      nanobanana_generate_1-Photoroom_28: -8576366822426700228
+      nanobanana_generate_1-Photoroom_3: -5799415562716415801
+      nanobanana_generate_1-Photoroom_4: -8240916604691331888
+      nanobanana_generate_1-Photoroom_5: -5650974539976241833
+      nanobanana_generate_1-Photoroom_6: 864925670764006191
+      nanobanana_generate_1-Photoroom_7: -725180223193014812
+      nanobanana_generate_1-Photoroom_8: -6468320227226669113
+      nanobanana_generate_1-Photoroom_9: 6133737349219694133
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
