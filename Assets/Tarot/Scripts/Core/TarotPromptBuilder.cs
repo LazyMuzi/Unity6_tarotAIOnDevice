@@ -1,33 +1,17 @@
-using UnityEngine;
 using Tarot.Data;
 
 namespace Tarot.Core
 {
     /// <summary>
-    /// LLM 모델에게 전달할 타로 리딩 프롬프트를 생성하는 클래스입니다.
-    /// 소형 로컬 모델에 맞춰 규칙을 최소화하고, 인라인 예시로 형식을 유도합니다.
+    /// 소형 온디바이스 모델용 — 시스템·유저 프롬프트를 짧고 고정된 형식으로만 전달합니다.
     /// </summary>
     public class TarotPromptBuilder
     {
         private const string SystemPromptMessage =
-            "당신은 타로 점술가예요. " +
-            "사용자의 고민과 뽑힌 카드를 연결해서 점괘를 알려 줘요.\n" +
-            "반드시 [생각]과 [점괘] 두 부분으로 나눠서 출력하세요.\n" +
-            "[생각]에서 고민과 카드 키워드를 짧게 분석하고, " +
-            "[점괘]에서 카드 이름을 꼭 언급하며 고민에 맞는 조언을 해요체로 2~3문장 써요.\n" +
-            "한국어만, 이모지 없이, 텍스트만 써요.";
-
-        private const string FewShotExample =
-            "[예시]\n" +
-            "고민: 오늘 저녁 메뉴 추천해줘\n" +
-            "카드: 은둔자\n" +
-            "키워드: 자기 성찰, 고독, 내면의 탐구\n" +
-            "[생각]\n" +
-            "저녁 메뉴 고민에 은둔자 카드이므로, 혼자 조용히 먹는 소박한 식사 쪽이 어울린다.\n" +
-            "[점괘]\n" +
-            "은둔자 카드가 나왔어요. " +
-            "오늘은 집에서 혼자 조용히 밥 먹는 시간이 더 잘 어울릴지도 몰라요. " +
-            "마음이 살짝 가벼워질 거예요.\n";
+            "타로 점술가. 해요체 한국어.\n" +
+            "답: 한 줄 [점괘] 다음 본문만. 고민:/분야:/카드: 같은 질문란은 답에 다시 쓰지 않음.\n" +
+            "한 장: 오늘·지금 조언만 2~3문장.\n" +
+            "스프레드: 본문에 [과거] [현재] [미래] 단어를 꼭 쓰고(대괄호 포함), 각 뒤에 해석 2~3문장. 세 구간 빠지면 안 됨. 이모지·굵게 없음.";
 
         /// <summary>
         /// 시스템 프롬프트를 반환합니다.
@@ -38,21 +22,49 @@ namespace Tarot.Core
         }
 
         /// <summary>
-        /// 사용자의 고민과 뽑힌 카드 데이터를 기반으로 AI에게 질문할 사용자 프롬프트를 생성합니다.
-        /// 인라인 예시를 먼저 보여준 뒤 실제 질문을 배치하여 소형 모델의 형식 추종을 유도합니다.
+        /// 데일리(한 장) 유저 메시지 — 라벨·값만 나열하고 [점괘]로 끝냅니다.
         /// </summary>
-        public string BuildUserPrompt(string userConcern, TarotCardData drawnCard)
+        public string BuildUserPrompt(
+            TarotConcernCategory category,
+            string userConcern,
+            TarotCardData drawnCard,
+            TarotCardOrientation orientation)
         {
-            string prompt =
-                FewShotExample +
-                "\n[실제 질문]\n" +
-                $"고민: {userConcern}\n" +
-                $"카드: {drawnCard.NameKr}\n" +
-                $"키워드: {drawnCard.Keywords}\n" +
-                $"카드 의미: {drawnCard.Meaning}\n" +
-                "[생각]";
+            string area = TarotConcernCategoryLabels.GetPromptLineKr(category);
+            string dir = TarotCardOrientationLabels.GetShortLabelKr(orientation);
+            return
+                $"분야:{area}\n" +
+                $"고민:{userConcern}\n" +
+                $"카드:{drawnCard.NameKr}({dir}) 키워드:{drawnCard.Keywords}\n" +
+                $"의미:{drawnCard.Meaning}\n" +
+                "[점괘]";
+        }
 
-            return prompt;
+        /// <summary>
+        /// 3장 스프레드 유저 메시지.
+        /// </summary>
+        public string BuildSpreadThreeCardPrompt(
+            TarotConcernCategory category,
+            string userConcern,
+            TarotCardData pastCard,
+            TarotCardOrientation pastOrientation,
+            TarotCardData presentCard,
+            TarotCardOrientation presentOrientation,
+            TarotCardData futureCard,
+            TarotCardOrientation futureOrientation)
+        {
+            string area = TarotConcernCategoryLabels.GetPromptLineKr(category);
+            string L(string slot, TarotCardData c, TarotCardOrientation o) =>
+                $"{slot}:{c.NameKr}({TarotCardOrientationLabels.GetShortLabelKr(o)}) 키워드:{c.Keywords} 의미:{c.Meaning}";
+
+            return
+                $"분야:{area}\n" +
+                $"고민:{userConcern}\n" +
+                L("과거", pastCard, pastOrientation) + "\n" +
+                L("현재", presentCard, presentOrientation) + "\n" +
+                L("미래", futureCard, futureOrientation) + "\n" +
+                "[점괘]\n" +
+                "답 형식: [과거]...(줄바꿈)...[현재]...(줄바꿈)...[미래]...";
         }
     }
 }

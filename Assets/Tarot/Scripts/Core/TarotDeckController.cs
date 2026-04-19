@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Tarot.Data;
 
@@ -26,6 +27,51 @@ namespace Tarot.Core
             int randomIndex = Random.Range(0, cards.Count);
             
             return cards[randomIndex];
+        }
+
+        /// <summary>
+        /// 전체 덱을 한 번 섞은 뒤 위에서부터 서로 다른 2장을 반환합니다.
+        /// </summary>
+        /// <returns>길이 2인 배열, 실패 시 null</returns>
+        public TarotCardData[] ShuffleAndDrawTwoCards()
+        {
+            var cards = TarotCardDatabase.GetAllCards();
+            if (cards == null || cards.Count < 2)
+            {
+                Debug.LogError("타로 카드 덱이 2장 미만입니다.");
+                return null;
+            }
+
+            var deck = new List<TarotCardData>(cards);
+            for (int i = deck.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (deck[i], deck[j]) = (deck[j], deck[i]);
+            }
+
+            return new[] { deck[0], deck[1] };
+        }
+
+        /// <summary>
+        /// 덱을 섞은 뒤 위에서부터 서로 다른 3장을 반환합니다 (과거·현재·미래 순).
+        /// </summary>
+        public TarotCardData[] ShuffleAndDrawThreeCards()
+        {
+            var cards = TarotCardDatabase.GetAllCards();
+            if (cards == null || cards.Count < 3)
+            {
+                Debug.LogError("타로 카드 덱이 3장 미만입니다.");
+                return null;
+            }
+
+            var deck = new List<TarotCardData>(cards);
+            for (int i = deck.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (deck[i], deck[j]) = (deck[j], deck[i]);
+            }
+
+            return new[] { deck[0], deck[1], deck[2] };
         }
     }
 }

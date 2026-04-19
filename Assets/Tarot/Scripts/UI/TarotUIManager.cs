@@ -1,9 +1,13 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 using TMPro;
+using LitMotion;
+using LitMotion.Extensions;
+using Tarot.Data;
 
 namespace Tarot.UI
 {
@@ -13,10 +17,16 @@ namespace Tarot.UI
     public class TarotUIManager : MonoBehaviour
     {
         private const string EnginePreparingMessage =
-            "AI 엔진을 준비하고 있습니다.\n잠시만 기다려 주세요.";
+            "타로를 보기 위해 준비 중이에요.\n잠시만 기다려 주세요.";
 
         private const string ModelSetupProgressFormat =
-            "AI 엔진을 준비하고 있습니다.\n모델 파일 준비: {0}%";
+            "타로를 보기 위해 준비 중이에요.\n진행: {0}%";
+
+        private const string CategoryStepWelcomeText =
+            "어떤 고민이 있으신가요?";
+
+        private const string ReadingModeStepWelcomeText =
+            "어떤 방법으로 볼까요?";
 
         private const string FallbackWelcomeDefaultText =
             "당신의 고민을 입력하고, 카드를 뽑아 보세요.";
@@ -28,6 +38,44 @@ namespace Tarot.UI
         [Header("Default UI")]
         [Tooltip("기본 UI를 표시할 텍스트")]
         [SerializeField] private TextMeshProUGUI _defaultUIText;
+
+        [Header("Category UI")]
+        [Tooltip("씬에서 만든 카테고리 선택 UI 루트. 지정하면 런타임에 패널을 만들지 않습니다. 버튼 OnClick → SubmitCategoryByEnumIndex(0~5).")]
+        [SerializeField] private GameObject _categorySelectionPanelRoot;
+
+        [Tooltip("카테고리 패널을 런타임 생성할 때만 부모로 씁니다. 위에 씬 패널을 넣은 경우 비워도 됩니다.")]
+        [SerializeField] private RectTransform _categoryPanelParentOverride;
+
+        [Header("Two-card choice")]
+        [Tooltip("2장 중 1장 선택 UI의 부모. 비우면 GamePlayUIRoot 아래에 패널을 만듭니다.")]
+        [SerializeField] private RectTransform _twoCardChoiceParentOverride;
+
+        [Tooltip("선택용 카드 슬롯 가로·세로(레이아웃).")]
+        [SerializeField] private Vector2 _twoCardChoiceSlotPreferredSize = new Vector2(360f, 540f);
+
+        [Tooltip("슬롯 최소 가로·세로.")]
+        [SerializeField] private Vector2 _twoCardChoiceSlotMinSize = new Vector2(280f, 420f);
+
+        [Header("Reading mode")]
+        [Tooltip("씬에서 만든 리딩 모드 선택 UI 루트. 지정하면 런타임 생성하지 않습니다. 버튼 OnClick → SubmitReadingModeByEnumIndex(0=데일리, 1=스프레드).")]
+        [SerializeField] private GameObject _readingModeSelectionPanelRoot;
+
+        [Tooltip("리딩 모드 패널을 런타임 생성할 때만 부모로 씁니다. 씬 패널을 쓰는 경우 비워도 됩니다.")]
+        [SerializeField] private RectTransform _readingModePanelParentOverride;
+
+        [Header("Spread 3-card")]
+        [Tooltip("씬에 미리 둔 스프레드 패널(루트에 TarotSpreadThreePanel). 지정 시 프리팹을 만들지 않고 이 오브젝트를 사용합니다.")]
+        [SerializeField] private TarotSpreadThreePanel _spreadThreeSceneInstance;
+
+        [Tooltip("SpreadThreeRoot 프리팹 — 루트에 TarotSpreadThreePanel, 인스펙터에서 슬롯·카드 참조 연결. _spreadThreeSceneInstance가 비어 있을 때만 Instantiate 합니다.")]
+        [SerializeField] private GameObject _spreadThreePanelPrefab;
+
+        [Tooltip("프리팹을 Instantiate 할 때의 부모. 비우면 GamePlayUIRoot 또는 이 컴포넌트 트랜스폼.")]
+        [SerializeField] private RectTransform _spreadThreeParentOverride;
+
+        private const float SpreadColumnNameUnderPreferredHeight = 56f;
+
+        [SerializeField] private Vector2 _spreadSlotPreferredSize = new Vector2(339.2f, 505.6f);
 
         [Header("Input UI")]
         [Tooltip("사용자가 고민을 입력하는 필드")]
@@ -66,8 +114,97 @@ namespace Tarot.UI
 
         private const int StreamingLayoutRefreshCharInterval = 16;
 
+        private const float SpreadCardMoveDuration = 0.38f;
+        private const string SpreadPickPastMessage = "과거 자리에 놓을 카드를 골라 주세요.";
+        private const string SpreadPickPresentMessage = "현재 자리에 놓을 카드를 골라 주세요.";
+        private const string SpreadPickFutureMessage = "미래 자리에 놓을 카드를 골라 주세요.";
+
         private CancellationTokenSource _streamingCts;
         private string _cachedWelcomeDefaultText;
+        private GameObject _categoryPanelRoot;
+        private TarotConcernCategory? _selectedCategory;
+
+        private GameObject _readingModeRoot;
+        private TarotReadingMode? _selectedReadingMode;
+
+        private GameObject _spreadThreeRoot;
+        private GameObject _spreadCenterRow;
+        private RectTransform[] _spreadCenterPickColumnRoots;
+        private Image[] _spreadCenterPickImages;
+        private RectTransform[] _spreadCenterPickRects;
+        private Button[] _spreadCenterPickButtons;
+        private RectTransform[] _spreadSlotCardHolders;
+        private Image[] _spreadThreeImages;
+        private RectTransform[] _spreadThreeImageRects;
+        private TextMeshProUGUI[] _spreadCardNameUnderTexts;
+        private TaskCompletionSource<int> _spreadCenterClickTcs;
+
+        private GameObject _twoCardChoiceRoot;
+        private Button _twoCardChoiceButtonLeft;
+        private Button _twoCardChoiceButtonRight;
+        private Image _twoCardChoiceImageLeft;
+        private Image _twoCardChoiceImageRight;
+        private TaskCompletionSource<TarotCardData> _twoCardChoiceTcs;
+        private TarotCardData _twoCardChoiceLeftData;
+        private TarotCardData _twoCardChoiceRightData;
+
+        /// <summary>
+        /// 사용자가 고른 고민 분야를 반환합니다. 선택하지 않았으면 false입니다.
+        /// </summary>
+        public bool TryGetSelectedCategory(out TarotConcernCategory category)
+        {
+            if (_selectedCategory.HasValue)
+            {
+                category = _selectedCategory.Value;
+                return true;
+            }
+
+            category = TarotConcernCategory.Other;
+            return false;
+        }
+
+        /// <summary>
+        /// 사용자가 고른 리딩 종류(데일리 / 3장 스프레드)를 반환합니다.
+        /// </summary>
+        public bool TryGetSelectedReadingMode(out TarotReadingMode mode)
+        {
+            if (_selectedReadingMode.HasValue)
+            {
+                mode = _selectedReadingMode.Value;
+                return true;
+            }
+
+            mode = TarotReadingMode.DailySingleCard;
+            return false;
+        }
+
+        /// <summary>
+        /// 씬 UI 버튼용: <see cref="TarotConcernCategory"/> 선언 순서 인덱스(0=연애·관계 … 5=기타).
+        /// </summary>
+        public void SubmitCategoryByEnumIndex(int index)
+        {
+            var order = (TarotConcernCategory[])Enum.GetValues(typeof(TarotConcernCategory));
+            if (index < 0 || index >= order.Length)
+                return;
+            OnCategoryChosen(order[index]);
+        }
+
+        /// <summary>
+        /// 씬 UI 버튼용: 0=데일리(1장), 1=과거·현재·미래 스프레드.
+        /// </summary>
+        public void SubmitReadingModeByEnumIndex(int index)
+        {
+            var order = (TarotReadingMode[])Enum.GetValues(typeof(TarotReadingMode));
+            if (index < 0 || index >= order.Length)
+                return;
+            OnReadingModeChosen(order[index]);
+        }
+
+        /// <summary>씬 UI 버튼에서 enum을 직접 넘길 수 있을 때(스크립트·커스텀 에디터).</summary>
+        public void SubmitCategory(TarotConcernCategory category) => OnCategoryChosen(category);
+
+        /// <summary>씬 UI 버튼에서 enum을 직접 넘길 수 있을 때.</summary>
+        public void SubmitReadingMode(TarotReadingMode mode) => OnReadingModeChosen(mode);
 
         private void Awake()
         {
@@ -83,7 +220,12 @@ namespace Tarot.UI
             if (_gameplayUiRoot != null)
                 _gameplayUiRoot.SetActive(true);
 
-            SetCoreGameplayWidgetsVisible(false);
+            HideCategoryUi();
+            HideReadingModeUi();
+            HideTwoCardChoiceUi();
+            HideSpreadThreeCardUi();
+            SetConcernAndDrawVisible(false);
+            SetReadingAreaVisible(false);
             SetResetButtonInteractable(false);
             HideCardUiArea();
             UpdateDefaultUIText(EnginePreparingMessage);
@@ -97,9 +239,6 @@ namespace Tarot.UI
             if (_gameplayUiRoot != null)
             {
                 _gameplayUiRoot.SetActive(visible);
-                if (visible)
-                    SetCoreGameplayWidgetsVisible(true);
-
                 return;
             }
 
@@ -111,12 +250,16 @@ namespace Tarot.UI
         /// <summary>
         /// 입력·뽑기·결과 텍스트만 토글합니다. 카드 이름은 카드 등장 시에만 표시합니다.
         /// </summary>
-        private void SetCoreGameplayWidgetsVisible(bool visible)
+        private void SetConcernAndDrawVisible(bool visible)
         {
             if (_concernInputField != null)
                 _concernInputField.gameObject.SetActive(visible);
             if (_drawCardButton != null)
                 _drawCardButton.gameObject.SetActive(visible);
+        }
+
+        private void SetReadingAreaVisible(bool visible)
+        {
             GameObject readingArea = _readingResultAreaRoot != null
                 ? _readingResultAreaRoot
                 : _readingResultText != null ? _readingResultText.gameObject : null;
@@ -124,11 +267,837 @@ namespace Tarot.UI
                 readingArea.SetActive(visible);
         }
 
+        private void SetCoreGameplayWidgetsVisible(bool visible)
+        {
+            SetConcernAndDrawVisible(visible);
+            SetReadingAreaVisible(visible);
+        }
+
+        private void EnsureCategoryPanelBuilt()
+        {
+            if (_categoryPanelRoot != null)
+                return;
+
+            if (_categorySelectionPanelRoot != null)
+            {
+                _categoryPanelRoot = _categorySelectionPanelRoot;
+                return;
+            }
+
+            Transform parent = _categoryPanelParentOverride != null
+                ? _categoryPanelParentOverride
+                : _gameplayUiRoot != null ? _gameplayUiRoot.transform : transform;
+
+            _categoryPanelRoot = new GameObject("CategoryUIRoot", typeof(RectTransform));
+            RectTransform rootRt = _categoryPanelRoot.GetComponent<RectTransform>();
+            rootRt.SetParent(parent, false);
+            rootRt.anchorMin = Vector2.zero;
+            rootRt.anchorMax = Vector2.one;
+            rootRt.offsetMin = new Vector2(48f, 280f);
+            rootRt.offsetMax = new Vector2(-48f, -280f);
+
+            var vlg = _categoryPanelRoot.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 14f;
+            vlg.childAlignment = TextAnchor.MiddleCenter;
+            vlg.childControlHeight = true;
+            vlg.childControlWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.childForceExpandWidth = true;
+
+            var categories = (TarotConcernCategory[])Enum.GetValues(typeof(TarotConcernCategory));
+            TMP_FontAsset font = _defaultUIText != null ? _defaultUIText.font : null;
+
+            foreach (TarotConcernCategory cat in categories)
+            {
+                CreateCategoryButtonRow(cat, rootRt, font);
+            }
+
+            rootRt.SetAsLastSibling();
+        }
+
+        private void CreateCategoryButtonRow(TarotConcernCategory category, RectTransform parent, TMP_FontAsset font)
+        {
+            var row = new GameObject("Category_" + category, typeof(RectTransform));
+            var rowRt = row.GetComponent<RectTransform>();
+            rowRt.SetParent(parent, false);
+
+            var le = row.AddComponent<LayoutElement>();
+            le.minHeight = 68f;
+            le.preferredHeight = 68f;
+            le.flexibleWidth = 1f;
+
+            var img = row.AddComponent<Image>();
+            img.color = new Color(0.12f, 0.14f, 0.22f, 0.92f);
+            img.raycastTarget = true;
+
+            var btn = row.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.2f, 0.24f, 0.34f, 1f);
+            colors.pressedColor = new Color(0.28f, 0.32f, 0.44f, 1f);
+            btn.colors = colors;
+
+            TarotConcernCategory captured = category;
+            btn.onClick.AddListener(() => OnCategoryChosen(captured));
+
+            var labelGo = new GameObject("Label", typeof(RectTransform));
+            labelGo.transform.SetParent(rowRt, false);
+            var labelRt = labelGo.GetComponent<RectTransform>();
+            labelRt.anchorMin = Vector2.zero;
+            labelRt.anchorMax = Vector2.one;
+            labelRt.offsetMin = new Vector2(20f, 8f);
+            labelRt.offsetMax = new Vector2(-20f, -8f);
+
+            var tmp = labelGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = TarotConcernCategoryLabels.GetShortLabelKr(category);
+            tmp.fontSize = 34f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+            if (font != null)
+                tmp.font = font;
+        }
+
+        private void OnCategoryChosen(TarotConcernCategory category)
+        {
+            _selectedCategory = category;
+            HideCategoryUi();
+            ShowReadingModeSelectionLayout();
+        }
+
+        private void HideCategoryUi()
+        {
+            if (_categoryPanelRoot != null)
+                _categoryPanelRoot.SetActive(false);
+        }
+
+        private void ShowCategorySelectionLayout()
+        {
+            EnsureCategoryPanelBuilt();
+            _selectedCategory = null;
+            _selectedReadingMode = null;
+            HideInputUI();
+            HideReadingModeUi();
+            HideTwoCardChoiceUi();
+            HideSpreadThreeCardUi();
+            SetConcernAndDrawVisible(false);
+            SetReadingAreaVisible(true);
+            if (_categoryPanelRoot != null)
+                _categoryPanelRoot.SetActive(true);
+            UpdateDefaultUIText(CategoryStepWelcomeText);
+        }
+
+        private void ShowReadingModeSelectionLayout()
+        {
+            EnsureReadingModePanelBuilt();
+            HideInputUI();
+            SetConcernAndDrawVisible(false);
+            HideTwoCardChoiceUi();
+            HideSpreadThreeCardUi();
+            SetReadingAreaVisible(true);
+            if (_readingModeRoot != null)
+                _readingModeRoot.SetActive(true);
+            UpdateDefaultUIText(ReadingModeStepWelcomeText);
+        }
+
+        private void EnsureReadingModePanelBuilt()
+        {
+            if (_readingModeRoot != null)
+                return;
+
+            if (_readingModeSelectionPanelRoot != null)
+            {
+                _readingModeRoot = _readingModeSelectionPanelRoot;
+                return;
+            }
+
+            Transform parent = _readingModePanelParentOverride != null
+                ? _readingModePanelParentOverride
+                : _gameplayUiRoot != null ? _gameplayUiRoot.transform : transform;
+
+            _readingModeRoot = new GameObject("ReadingModeUIRoot", typeof(RectTransform));
+            RectTransform rootRt = _readingModeRoot.GetComponent<RectTransform>();
+            rootRt.SetParent(parent, false);
+            rootRt.anchorMin = Vector2.zero;
+            rootRt.anchorMax = Vector2.one;
+            rootRt.offsetMin = new Vector2(48f, 280f);
+            rootRt.offsetMax = new Vector2(-48f, -280f);
+
+            var vlg = _readingModeRoot.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 14f;
+            vlg.childAlignment = TextAnchor.MiddleCenter;
+            vlg.childControlHeight = true;
+            vlg.childControlWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.childForceExpandWidth = true;
+
+            TMP_FontAsset font = _defaultUIText != null ? _defaultUIText.font : null;
+            var modes = (TarotReadingMode[])Enum.GetValues(typeof(TarotReadingMode));
+            foreach (TarotReadingMode mode in modes)
+            {
+                CreateReadingModeButtonRow(mode, rootRt, font);
+            }
+
+            rootRt.SetAsLastSibling();
+        }
+
+        private void CreateReadingModeButtonRow(TarotReadingMode mode, RectTransform parent, TMP_FontAsset font)
+        {
+            var row = new GameObject("ReadingMode_" + mode, typeof(RectTransform));
+            var rowRt = row.GetComponent<RectTransform>();
+            rowRt.SetParent(parent, false);
+
+            var le = row.AddComponent<LayoutElement>();
+            le.minHeight = 72f;
+            le.preferredHeight = 72f;
+            le.flexibleWidth = 1f;
+
+            var img = row.AddComponent<Image>();
+            img.color = new Color(0.14f, 0.18f, 0.28f, 0.94f);
+            img.raycastTarget = true;
+
+            var btn = row.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            TarotReadingMode captured = mode;
+            btn.onClick.AddListener(() => OnReadingModeChosen(captured));
+
+            var labelGo = new GameObject("Label", typeof(RectTransform));
+            labelGo.transform.SetParent(rowRt, false);
+            var labelRt = labelGo.GetComponent<RectTransform>();
+            labelRt.anchorMin = Vector2.zero;
+            labelRt.anchorMax = Vector2.one;
+            labelRt.offsetMin = new Vector2(16f, 8f);
+            labelRt.offsetMax = new Vector2(-16f, -8f);
+
+            var tmp = labelGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = TarotReadingModeLabels.GetButtonLabelKr(mode);
+            tmp.fontSize = 30f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+            if (font != null)
+                tmp.font = font;
+        }
+
+        private void OnReadingModeChosen(TarotReadingMode mode)
+        {
+            _selectedReadingMode = mode;
+            HideReadingModeUi();
+            ShowInputUI();
+            SetConcernAndDrawVisible(true);
+            SetReadingAreaVisible(true);
+
+            if (_defaultUIText != null)
+            {
+                _defaultUIText.gameObject.SetActive(true);
+                _defaultUIText.text = string.IsNullOrEmpty(_cachedWelcomeDefaultText)
+                    ? FallbackWelcomeDefaultText
+                    : _cachedWelcomeDefaultText;
+            }
+        }
+
+        private void HideReadingModeUi()
+        {
+            if (_readingModeRoot != null)
+                _readingModeRoot.SetActive(false);
+        }
+
+        /// <summary>
+        /// 과거·현재·미래 3장을 뒷면으로 표시합니다. 확인 버튼 없이 바로 이후 단계(AI 등)로 이어집니다.
+        /// </summary>
+        public void ShowSpreadThreeCardsBacks(TarotCardData[] threeCards, Sprite cardBack)
+        {
+            if (threeCards == null || threeCards.Length < 3)
+                return;
+
+            EnsureSpreadThreePanelBuilt();
+            if (_spreadCenterPickImages == null)
+                return;
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (_spreadCenterPickImages[i] != null)
+                {
+                    _spreadCenterPickImages[i].sprite = cardBack;
+                    _spreadCenterPickImages[i].preserveAspect = true;
+                }
+
+                if (_spreadCenterPickRects != null && i < _spreadCenterPickRects.Length && _spreadCenterPickRects[i] != null)
+                    _spreadCenterPickRects[i].localEulerAngles = Vector3.zero;
+            }
+
+            if (_spreadThreeRoot != null)
+                _spreadThreeRoot.SetActive(true);
+
+            BringReadingResultAreaToFront();
+        }
+
+        /// <summary>
+        /// 점괘 영역(스크롤)을 형제 UI보다 앞에 그려 텍스트가 카드에 가리지 않게 합니다.
+        /// </summary>
+        public void BringReadingResultAreaToFront()
+        {
+            if (_readingResultAreaRoot != null)
+            {
+                _readingResultAreaRoot.transform.SetAsLastSibling();
+                return;
+            }
+
+            if (_readingResultText != null)
+                _readingResultText.transform.SetAsLastSibling();
+        }
+
+        /// <summary>
+        /// 점괘 텍스트 끝에 내용을 이어 붙입니다. (스프레드 순차 공개용)
+        /// </summary>
+        public void AppendReadingResultText(string text)
+        {
+            if (_readingResultText == null || string.IsNullOrEmpty(text))
+                return;
+
+            _readingResultText.text += text;
+            RefreshReadingResultScrollLayout(false);
+        }
+
+        /// <summary>
+        /// 가운데 제시된 세 장을 과거→현재→미래 순으로 골라 각 슬롯으로 옮긴 뒤, 슬롯 인덱스(0=과거)별로 뽑은 카드의 덱 인덱스를 반환합니다.
+        /// </summary>
+        public async Task<int[]> WaitForSpreadCenterPlacementAsync(Sprite cardBack, TarotCardData[] threeCards)
+        {
+            if (threeCards == null || threeCards.Length < 3)
+                return new[] { 0, 1, 2 };
+
+            EnsureSpreadThreePanelBuilt();
+            if (_spreadCenterPickImages == null || _spreadCenterPickRects == null)
+                return new[] { 0, 1, 2 };
+
+            ResetSpreadPickCardsToCenter(cardBack);
+
+            if (_spreadThreeRoot != null)
+                _spreadThreeRoot.SetActive(true);
+
+            var placed = new bool[3];
+            var deckIndexForSlot = new int[3];
+            string[] pickMessages = { SpreadPickPastMessage, SpreadPickPresentMessage, SpreadPickFutureMessage };
+
+            for (int step = 0; step < 3; step++)
+            {
+                UpdateDefaultUIText(pickMessages[step]);
+
+                int deckIndex;
+                do
+                {
+                    _spreadCenterClickTcs = new TaskCompletionSource<int>();
+                    deckIndex = await _spreadCenterClickTcs.Task;
+                } while (deckIndex < 0 || deckIndex > 2 || placed[deckIndex]);
+
+                placed[deckIndex] = true;
+                deckIndexForSlot[step] = deckIndex;
+
+                await AnimateSpreadCardIntoSlotAsync(_spreadCenterPickRects[deckIndex], _spreadSlotCardHolders[step]);
+                _spreadCenterPickButtons[deckIndex].interactable = false;
+            }
+
+            for (int s = 0; s < 3; s++)
+            {
+                _spreadThreeImages[s] = _spreadCenterPickImages[deckIndexForSlot[s]];
+                _spreadThreeImageRects[s] = _spreadCenterPickRects[deckIndexForSlot[s]];
+            }
+
+            if (_spreadCenterRow != null)
+                _spreadCenterRow.SetActive(false);
+
+            _spreadCenterClickTcs = null;
+            return deckIndexForSlot;
+        }
+
+        /// <summary>
+        /// 세 슬롯의 카드를 동시에 뒤집고 과거·현재·미래 점괘를 표시합니다.
+        /// </summary>
+        public async Task RunSpreadFlipAllAndShowResultAsync(
+            Sprite[] frontSpritesBySlot,
+            TarotCardOrientation[] orientationsBySlot,
+            string[] sectionTexts,
+            string readingIntro,
+            TarotCardData[] cardsBySlot)
+        {
+            if (frontSpritesBySlot == null || orientationsBySlot == null
+                || frontSpritesBySlot.Length < 3 || orientationsBySlot.Length < 3)
+                return;
+
+            EnsureSpreadThreePanelBuilt();
+            if (_spreadThreeImageRects == null || _spreadThreeImages == null)
+                return;
+
+            ClearSpreadCardNameUnderTexts();
+
+            SetReadingResultScrollActive(true);
+            UpdateReadingResultUI(string.IsNullOrEmpty(readingIntro) ? string.Empty : readingIntro + "\n\n");
+            BringReadingResultAreaToFront();
+
+            if (_spreadThreeRoot != null)
+                _spreadThreeRoot.SetActive(true);
+
+            var flipTasks = new Task[3];
+            for (int i = 0; i < 3; i++)
+                flipTasks[i] = FlipSpreadSlotAsync(i, frontSpritesBySlot[i], orientationsBySlot[i]);
+            await Task.WhenAll(flipTasks);
+
+            var nameRevealed = new[] { true, true, true };
+            for (int i = 0; i < 3; i++)
+                SetSpreadSlotCardNameUnder(i, cardsBySlot[i], orientationsBySlot[i]);
+            RebuildSpreadCardNameLines(cardsBySlot, orientationsBySlot, nameRevealed);
+
+            string[] labels = { "과거", "현재", "미래" };
+            for (int i = 0; i < 3; i++)
+            {
+                string piece = sectionTexts != null && i < sectionTexts.Length
+                    ? sectionTexts[i]?.Trim() ?? string.Empty
+                    : string.Empty;
+                if (string.IsNullOrWhiteSpace(piece))
+                    piece = "해석을 불러오지 못했어요. 다시 시도해 보세요.";
+
+                AppendReadingResultText(labels[i] + "\n\n" + piece + "\n\n");
+            }
+        }
+
+        private void ResetSpreadPickCardsToCenter(Sprite cardBack)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                RectTransform rt = _spreadCenterPickRects[i];
+                rt.SetParent(_spreadCenterPickColumnRoots[i], false);
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(_spreadSlotPreferredSize.x, _spreadSlotPreferredSize.y);
+                rt.localScale = Vector3.one;
+                rt.localEulerAngles = Vector3.zero;
+                _spreadCenterPickImages[i].sprite = cardBack;
+                _spreadCenterPickImages[i].preserveAspect = true;
+                _spreadCenterPickButtons[i].interactable = true;
+            }
+
+            if (_spreadCenterRow != null)
+                _spreadCenterRow.SetActive(true);
+
+            SetSpreadSlotHolderBackgroundImagesEnabled(true);
+        }
+
+        /// <summary>
+        /// SlotCardHolder 루트의 배경 <see cref="Image"/>를 켜거나 끕니다. 카드가 슬롯에 들어가면 끄고, 리셋·배치 시작 시 켭니다.
+        /// </summary>
+        private void SetSpreadSlotHolderBackgroundImagesEnabled(bool enabled)
+        {
+            if (_spreadSlotCardHolders == null)
+                return;
+            for (int i = 0; i < _spreadSlotCardHolders.Length; i++)
+            {
+                RectTransform holder = _spreadSlotCardHolders[i];
+                if (holder == null)
+                    continue;
+                Image bg = holder.GetComponent<Image>();
+                if (bg != null)
+                    bg.enabled = enabled;
+            }
+        }
+
+        private async Task AnimateSpreadCardIntoSlotAsync(RectTransform cardRt, RectTransform slotHolder)
+        {
+            cardRt.SetParent(slotHolder, true);
+            float sx = cardRt.anchoredPosition.x;
+            float sy = cardRt.anchoredPosition.y;
+            float dur = SpreadCardMoveDuration;
+            await LMotion.Create(sx, 0f, dur).WithEase(Ease.InOutQuad).BindToAnchoredPositionX(cardRt);
+            await LMotion.Create(sy, 0f, dur).WithEase(Ease.InOutQuad).BindToAnchoredPositionY(cardRt);
+            cardRt.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRt.pivot = new Vector2(0.5f, 0.5f);
+            cardRt.anchoredPosition = Vector2.zero;
+            cardRt.sizeDelta = new Vector2(_spreadSlotPreferredSize.x, _spreadSlotPreferredSize.y);
+
+            Image holderBg = slotHolder.GetComponent<Image>();
+            if (holderBg != null)
+                holderBg.enabled = false;
+        }
+
+        private void OnSpreadCenterCardClicked(int deckIndex)
+        {
+            if (_spreadCenterClickTcs == null)
+                return;
+            if (deckIndex < 0 || deckIndex > 2)
+                return;
+
+            _spreadCenterClickTcs.TrySetResult(deckIndex);
+        }
+
+        /// <summary>
+        /// 스프레드 상단 제목만 표시합니다. 카드별 이름은 각 슬롯 아래 <see cref="SetSpreadSlotCardNameUnder"/>에서 냅니다.
+        /// </summary>
+        private void RebuildSpreadCardNameLines(
+            TarotCardData[] cards,
+            TarotCardOrientation[] orientations,
+            bool[] revealed)
+        {
+            if (_cardNameText == null || cards == null || revealed == null)
+                return;
+
+            bool any = revealed[0] || revealed[1] || revealed[2];
+            if (!any)
+            {
+                _cardNameText.gameObject.SetActive(false);
+                return;
+            }
+
+            if (_cardUiRoot != null)
+                _cardUiRoot.SetActive(true);
+
+            _cardNameText.gameObject.SetActive(true);
+            _cardNameText.text = "3장 스프레드 (과거·현재·미래)";
+        }
+
+        private void SetSpreadSlotCardNameUnder(int index, TarotCardData card, TarotCardOrientation orientation)
+        {
+            if (_spreadCardNameUnderTexts == null || index < 0 || index >= _spreadCardNameUnderTexts.Length)
+                return;
+
+            TextMeshProUGUI tmp = _spreadCardNameUnderTexts[index];
+            if (tmp == null)
+                return;
+
+            string dir = TarotCardOrientationLabels.GetShortLabelKr(orientation);
+            tmp.text = $"{card.NameKr}\n{card.NameEn}\n{dir}";
+        }
+
+        /// <summary>
+        /// 슬롯 아래 카드명(한글·영문·방향) TMP를 비웁니다. 리셋·스프레드 결과 시작 시 사용합니다.
+        /// </summary>
+        private void ClearSpreadCardNameUnderTexts()
+        {
+            if (_spreadCardNameUnderTexts == null)
+                return;
+            for (int i = 0; i < _spreadCardNameUnderTexts.Length; i++)
+            {
+                if (_spreadCardNameUnderTexts[i] != null)
+                    _spreadCardNameUnderTexts[i].text = string.Empty;
+            }
+        }
+
+        private async Task FlipSpreadSlotAsync(int index, Sprite frontSprite, TarotCardOrientation orientation)
+        {
+            RectTransform rt = _spreadThreeImageRects[index];
+            Image img = _spreadThreeImages[index];
+            if (rt == null || img == null)
+                return;
+
+            float z = orientation == TarotCardOrientation.Reversed ? 180f : 0f;
+            rt.localEulerAngles = new Vector3(0f, 0f, z);
+
+            const float half = 0.16f;
+            await LMotion.Create(rt.localScale.x, 0f, half)
+                .WithEase(Ease.InOutQuad)
+                .BindToLocalScaleX(rt);
+
+            img.sprite = frontSprite;
+            img.preserveAspect = true;
+
+            await LMotion.Create(0f, 1f, half)
+                .WithEase(Ease.InOutQuad)
+                .BindToLocalScaleX(rt);
+        }
+
+        private void EnsureSpreadThreePanelBuilt()
+        {
+            if (_spreadThreeRoot != null && _spreadCenterRow != null)
+                return;
+
+            TarotSpreadThreePanel panel = null;
+
+            if (_spreadThreeSceneInstance != null)
+                panel = _spreadThreeSceneInstance;
+            else if (_spreadThreePanelPrefab != null)
+            {
+                Transform parent = _spreadThreeParentOverride != null
+                    ? _spreadThreeParentOverride
+                    : _gameplayUiRoot != null ? _gameplayUiRoot.transform : transform;
+
+                GameObject instance = Instantiate(_spreadThreePanelPrefab, parent, false);
+                panel = instance.GetComponent<TarotSpreadThreePanel>();
+                if (panel == null)
+                {
+                    Debug.LogError("[TarotUIManager] _spreadThreePanelPrefab 루트에 TarotSpreadThreePanel 컴포넌트가 필요합니다.");
+                    Destroy(instance);
+                    return;
+                }
+            }
+            else
+            {
+                Debug.LogError("[TarotUIManager] 3장 스프레드: TarotSpreadThreePanel이 있는 씬 인스턴스 또는 프리팹을 지정해 주세요.");
+                return;
+            }
+
+            WireSpreadReferencesFromPanel(panel);
+            if (_spreadThreeRoot == null)
+                return;
+
+            _spreadThreeRoot.SetActive(false);
+        }
+
+        private void WireSpreadReferencesFromPanel(TarotSpreadThreePanel panel)
+        {
+            if (panel == null || !panel.ValidateBindings())
+            {
+                Debug.LogError("[TarotUIManager] TarotSpreadThreePanel 참조가 비었습니다. 프리팹에서 Center Row, 카드×3, 슬롯×3, 이름 TMP×3를 연결해 주세요.");
+                return;
+            }
+
+            _spreadThreeRoot = panel.gameObject;
+            _spreadCenterRow = panel.CenterRow;
+            _spreadCenterPickColumnRoots = panel.CenterPickColumnRoots;
+            _spreadCenterPickImages = panel.CenterPickCardImages;
+            _spreadCenterPickButtons = panel.CenterPickButtons;
+            _spreadSlotCardHolders = panel.SlotCardHolders;
+            _spreadCardNameUnderTexts = panel.CardNameUnderTexts;
+
+            _spreadCenterPickRects = new RectTransform[3];
+            for (int i = 0; i < 3; i++)
+                _spreadCenterPickRects[i] = _spreadCenterPickImages[i].rectTransform;
+
+            _spreadThreeImages = new Image[3];
+            _spreadThreeImageRects = new RectTransform[3];
+
+            for (int i = 0; i < 3; i++)
+            {
+                int captured = i;
+                _spreadCenterPickButtons[i].onClick.RemoveAllListeners();
+                _spreadCenterPickButtons[i].onClick.AddListener(() => OnSpreadCenterCardClicked(captured));
+            }
+        }
+
+        /// <summary>
+        /// 3장 스프레드 패널을 숨깁니다.
+        /// </summary>
+        public void HideSpreadThreeCardUi()
+        {
+            _spreadCenterClickTcs = null;
+            ClearSpreadCardNameUnderTexts();
+            SetSpreadSlotHolderBackgroundImagesEnabled(true);
+            if (_spreadThreeRoot != null)
+                _spreadThreeRoot.SetActive(false);
+        }
+
+        /// <summary>
+        /// 3장 스프레드 결과용 카드 요약 텍스트를 표시합니다.
+        /// </summary>
+        public void UpdateCardNameUIForSpread(
+            TarotCardData past,
+            TarotCardOrientation pastOr,
+            TarotCardData present,
+            TarotCardOrientation presentOr,
+            TarotCardData future,
+            TarotCardOrientation futureOr)
+        {
+            if (_cardNameText == null)
+                return;
+
+            if (_cardUiRoot != null)
+                _cardUiRoot.SetActive(true);
+
+            _cardNameText.gameObject.SetActive(true);
+
+            string Line(string pos, TarotCardData c, TarotCardOrientation o)
+            {
+                return $"{pos}: {c.NameKr} ({c.NameEn}) · {TarotCardOrientationLabels.GetShortLabelKr(o)}";
+            }
+
+            _cardNameText.text =
+                "3장 스프레드 (과거·현재·미래)\n" +
+                $"{Line("과거", past, pastOr)}\n" +
+                $"{Line("현재", present, presentOr)}\n" +
+                $"{Line("미래", future, futureOr)}";
+        }
+
+        /// <summary>
+        /// 덱에서 제시된 2장 중 사용자가 탭할 때까지 비동기로 대기합니다. 두 장 모두 뒷면으로 표시합니다.
+        /// </summary>
+        public async Task<TarotCardData> WaitForTwoCardSelectionAsync(
+            TarotCardData cardLeft,
+            TarotCardData cardRight,
+            Sprite cardBack)
+        {
+            EnsureTwoCardChoicePanelBuilt();
+            ApplyTwoCardChoiceSlotSizes();
+
+            _twoCardChoiceLeftData = cardLeft;
+            _twoCardChoiceRightData = cardRight;
+            _twoCardChoiceTcs = new TaskCompletionSource<TarotCardData>();
+
+            if (_twoCardChoiceImageLeft != null)
+            {
+                _twoCardChoiceImageLeft.sprite = cardBack;
+                _twoCardChoiceImageLeft.preserveAspect = true;
+            }
+
+            if (_twoCardChoiceImageRight != null)
+            {
+                _twoCardChoiceImageRight.sprite = cardBack;
+                _twoCardChoiceImageRight.preserveAspect = true;
+            }
+
+            if (_twoCardChoiceButtonLeft != null)
+            {
+                _twoCardChoiceButtonLeft.onClick.RemoveAllListeners();
+                _twoCardChoiceButtonLeft.onClick.AddListener(OnTwoCardChoiceLeftClicked);
+                _twoCardChoiceButtonLeft.interactable = true;
+            }
+
+            if (_twoCardChoiceButtonRight != null)
+            {
+                _twoCardChoiceButtonRight.onClick.RemoveAllListeners();
+                _twoCardChoiceButtonRight.onClick.AddListener(OnTwoCardChoiceRightClicked);
+                _twoCardChoiceButtonRight.interactable = true;
+            }
+
+            if (_twoCardChoiceRoot != null)
+            {
+                _twoCardChoiceRoot.SetActive(true);
+                _twoCardChoiceRoot.transform.SetAsLastSibling();
+            }
+
+            return await _twoCardChoiceTcs.Task;
+        }
+
+        private void OnTwoCardChoiceLeftClicked()
+        {
+            CompleteTwoCardChoice(_twoCardChoiceLeftData);
+        }
+
+        private void OnTwoCardChoiceRightClicked()
+        {
+            CompleteTwoCardChoice(_twoCardChoiceRightData);
+        }
+
+        private void CompleteTwoCardChoice(TarotCardData card)
+        {
+            if (_twoCardChoiceButtonLeft != null)
+                _twoCardChoiceButtonLeft.interactable = false;
+            if (_twoCardChoiceButtonRight != null)
+                _twoCardChoiceButtonRight.interactable = false;
+
+            HideTwoCardChoiceUi();
+
+            if (_twoCardChoiceButtonLeft != null)
+                _twoCardChoiceButtonLeft.interactable = true;
+            if (_twoCardChoiceButtonRight != null)
+                _twoCardChoiceButtonRight.interactable = true;
+
+            _twoCardChoiceTcs?.TrySetResult(card);
+        }
+
+        private void EnsureTwoCardChoicePanelBuilt()
+        {
+            if (_twoCardChoiceRoot != null)
+                return;
+
+            Transform parent = _twoCardChoiceParentOverride != null
+                ? _twoCardChoiceParentOverride
+                : _gameplayUiRoot != null ? _gameplayUiRoot.transform : transform;
+
+            _twoCardChoiceRoot = new GameObject("TwoCardChoiceRoot", typeof(RectTransform));
+            RectTransform rootRt = _twoCardChoiceRoot.GetComponent<RectTransform>();
+            rootRt.SetParent(parent, false);
+            rootRt.anchorMin = Vector2.zero;
+            rootRt.anchorMax = Vector2.one;
+            rootRt.offsetMin = new Vector2(16f, 200f);
+            rootRt.offsetMax = new Vector2(-16f, -240f);
+
+            var hlg = _twoCardChoiceRoot.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 32f;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.padding = new RectOffset(8, 8, 8, 8);
+
+            _twoCardChoiceButtonLeft = CreateCardChoiceSlot(rootRt, "ChoiceLeft", out _twoCardChoiceImageLeft);
+            _twoCardChoiceButtonRight = CreateCardChoiceSlot(rootRt, "ChoiceRight", out _twoCardChoiceImageRight);
+
+            _twoCardChoiceRoot.SetActive(false);
+        }
+
+        private void ApplyTwoCardChoiceSlotSizes()
+        {
+            if (_twoCardChoiceRoot == null)
+                return;
+
+            for (int i = 0; i < _twoCardChoiceRoot.transform.childCount; i++)
+            {
+                var le = _twoCardChoiceRoot.transform.GetChild(i).GetComponent<LayoutElement>();
+                if (le == null)
+                    continue;
+
+                le.preferredWidth = _twoCardChoiceSlotPreferredSize.x;
+                le.preferredHeight = _twoCardChoiceSlotPreferredSize.y;
+                le.minWidth = _twoCardChoiceSlotMinSize.x;
+                le.minHeight = _twoCardChoiceSlotMinSize.y;
+                le.flexibleWidth = 0f;
+            }
+        }
+
+        private Button CreateCardChoiceSlot(RectTransform parent, string name, out Image cardImage)
+        {
+            var slot = new GameObject(name, typeof(RectTransform));
+            var slotRt = slot.GetComponent<RectTransform>();
+            slotRt.SetParent(parent, false);
+
+            var le = slot.AddComponent<LayoutElement>();
+            le.preferredWidth = _twoCardChoiceSlotPreferredSize.x;
+            le.preferredHeight = _twoCardChoiceSlotPreferredSize.y;
+            le.minWidth = _twoCardChoiceSlotMinSize.x;
+            le.minHeight = _twoCardChoiceSlotMinSize.y;
+            le.flexibleWidth = 0f;
+
+            cardImage = slot.AddComponent<Image>();
+            cardImage.color = Color.white;
+            cardImage.preserveAspect = true;
+            cardImage.raycastTarget = true;
+
+            var btn = slot.AddComponent<Button>();
+            btn.targetGraphic = cardImage;
+            return btn;
+        }
+
+        /// <summary>
+        /// 2장 선택 패널을 숨깁니다.
+        /// </summary>
+        public void HideTwoCardChoiceUi()
+        {
+            if (_twoCardChoiceRoot != null)
+                _twoCardChoiceRoot.SetActive(false);
+        }
+
+        /// <summary>
+        /// 셔플·선택 단계에서 흐름이 끊겼을 때 고민 입력 UI를 다시 표시합니다.
+        /// </summary>
+        public void RestoreConcernInputAfterInterruptedFlow()
+        {
+            HideTwoCardChoiceUi();
+            HideSpreadThreeCardUi();
+            HideCategoryUi();
+            HideReadingModeUi();
+            ShowInputUI();
+            SetConcernAndDrawVisible(true);
+            SetReadingAreaVisible(true);
+            SetReadingResultScrollActive(false);
+        }
+
         /// <summary>
         /// 카드 관련 UI 전체(CardUIRoot)를 숨기고 카드 이름 텍스트를 비웁니다.
         /// </summary>
         public void HideCardUiArea()
         {
+            HideSpreadThreeCardUi();
             if (_cardUiRoot != null)
                 _cardUiRoot.SetActive(false);
 
@@ -232,6 +1201,14 @@ namespace Tarot.UI
         /// </summary>
         public void UpdateCardNameUI(string nameKr, string nameEn)
         {
+            UpdateCardNameUI(nameKr, nameEn, TarotCardOrientation.Upright);
+        }
+
+        /// <summary>
+        /// 화면에 뽑힌 카드 이름과 정·역방향을 업데이트합니다.
+        /// </summary>
+        public void UpdateCardNameUI(string nameKr, string nameEn, TarotCardOrientation orientation)
+        {
             if (_cardNameText == null) return;
 
             if (string.IsNullOrWhiteSpace(nameKr) && string.IsNullOrWhiteSpace(nameEn))
@@ -244,7 +1221,19 @@ namespace Tarot.UI
                 _cardUiRoot.SetActive(true);
 
             _cardNameText.gameObject.SetActive(true);
-            _cardNameText.text = $"선택된 카드:\n{nameKr} ({nameEn})";
+            string direction = TarotCardOrientationLabels.GetShortLabelKr(orientation);
+            _cardNameText.text = $"선택된 카드:\n{nameKr} ({nameEn})\n방향: {direction}";
+        }
+
+        /// <summary>
+        /// 점괘 스크롤(또는 결과 영역)을 켜거나 끕니다. 끄면 레이캐스트가 통과해 카드 터치가 살아납니다.
+        /// </summary>
+        public void SetReadingResultScrollActive(bool active)
+        {
+            if (_readingResultScrollRect != null)
+                _readingResultScrollRect.gameObject.SetActive(active);
+            else if (_readingResultAreaRoot != null)
+                _readingResultAreaRoot.SetActive(active);
         }
 
         /// <summary>
@@ -252,9 +1241,11 @@ namespace Tarot.UI
         /// </summary>
         public void UpdateReadingResultUI(string resultText)
         {
+            bool hasText = !string.IsNullOrEmpty(resultText);
+
             if (_readingResultText != null)
-                _readingResultText.text = resultText;
-            RefreshReadingResultScrollLayout(string.IsNullOrEmpty(resultText));
+                _readingResultText.text = resultText ?? string.Empty;
+            RefreshReadingResultScrollLayout(!hasText);
         }
 
         /// <summary>
@@ -268,6 +1259,7 @@ namespace Tarot.UI
 
             if (_readingResultText == null) return;
 
+            SetReadingResultScrollActive(true);
             _readingResultText.text = string.Empty;
             if (_readingResultScrollRect != null)
                 _readingResultScrollRect.verticalNormalizedPosition = 1f;
@@ -357,27 +1349,24 @@ namespace Tarot.UI
         }
 
         /// <summary>
-        /// 초기 UI 상태로 리셋합니다.
+        /// 초기 UI 상태로 리셋합니다. 카테고리 선택 화면부터 다시 시작합니다.
         /// </summary>
         public void ResetUI()
         {
             CancelStreaming();
 
-            ShowInputUI();
-            SetCoreGameplayWidgetsVisible(true);
             SetDrawButtonInteractable(true);
             SetResetButtonInteractable(false);
 
-            if (_defaultUIText != null)
-            {
-                _defaultUIText.gameObject.SetActive(true);
-                _defaultUIText.text = string.IsNullOrEmpty(_cachedWelcomeDefaultText)
-                    ? FallbackWelcomeDefaultText
-                    : _cachedWelcomeDefaultText;
-            }
+            ShowCategorySelectionLayout();
+
+            if (_readingResultText != null)
+                _readingResultText.text = string.Empty;
+            SetReadingResultScrollActive(false);
 
             HideCardUiArea();
-            UpdateReadingResultUI("");
+
+            _readingResultAreaRoot.transform.SetSiblingIndex(1);
         }
 
         private void OnDestroy()

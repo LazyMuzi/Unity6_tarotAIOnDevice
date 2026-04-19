@@ -7,100 +7,113 @@
 | 항목 | 위치 |
 |------|------|
 | 타로 스크립트·씬·에셋 | **`Assets/Tarot/`** |
-| 메인 씬 | **`Assets/Tarot/Scenes/TodayScene.unity`** |
-| 빌드 씬 등록 | **`ProjectSettings/EditorBuildSettings.asset`** → 위 씬 |
+| 빌드에 등록된 씬 | **`Assets/Tarot/Scenes/TodayScene.unity`** (`EditorBuildSettings`) |
+| 추가 씬 | `Assets/Tarot/Scenes/` 아래 `Menu.unity` 등은 빌드 목록에 없을 수 있음 — 배포 전 `ProjectSettings/EditorBuildSettings.asset` 확인 |
 
-레거시 `Assets/Scripts/`, `Assets/Scenes/` 등은 제거 상태입니다. 경로는 `Assets/Tarot/` 와 `EditorBuildSettings`로 확인하세요.
+## 런타임 플로우
 
-## 런타임 플로우 (`TarotGameManager`)
+### 초기화 (`TarotAIManager`)
 
-1. **뽑기 버튼** `OnDrawButtonClicked`
-   - `IsReady` false → 결과 TMP에 안내.
-   - 고민 공백 → `_defaultUIText`에 안내.
-   - 통과 시: 뽑기·리셋 버튼 비활성, **`HideInputUI`**, `ExecuteTarotReadingFlowAsync`.
-2. **`ExecuteTarotReadingFlowAsync`**
-   - `HideCardUiArea`, `HideCard`, 결과 TMP 비움, 진행 안내.
-   - `DrawRandomCard` → `BuildUserPrompt` → **`RequestTarotReadingAsync`** (완료 await).
-   - **`ExtractReadingResult`**: 프롬프트 접두 제거 → **`[점괘]`** (`ReadingSectionTag`) 뒤만 사용 → **`SanitizeReadingText`**(후처리) → `". "` → `".\n"`.
-   - `HideDefaultUI` → `ShowCardUiArea` → `ShowCardAsync` → `UpdateCardNameUI` → `StreamReadingResultAsync`.
-   - 끝나면 **`SetResetButtonInteractable(true)`**, 뽑기 버튼 다시 활성.
-3. **리셋 버튼** `OnResetButtonClicked`
-   - 처리 중이면 무시. `HideCard`, **`ClearConcernInput`**, **`ResetUI`**.
+1. `ShowEnginePreparingUi` → 모델 준비 중 `UpdateModelSetupProgress`
+2. `LLM.WaitUntilModelSetup` → `_llm.WaitUntilReady` → `IsReady = true`
+3. `SetGameplayUiVisible(true)` → `ResetUI()` → **`ShowCategorySelectionLayout`** (카테고리 단계부터)
 
-**엔진 초기화** (`TarotAIManager`): `ShowEnginePreparingUi` → `UpdateModelSetupProgress` → 준비 후 `SetGameplayUiVisible(true)` + `ResetUI`.
+### 사용자 단계 (UI)
 
-## 후처리 (`SanitizeReadingText`)
+1. **카테고리** (`TarotConcernCategory`) → **리딩 종류** 화면  
+2. **리딩 종류** (`TarotReadingMode`: 데일리 1장 / 스프레드 3장) → **고민 입력** + 뽑기 버튼  
+3. **뽑기** → `TarotGameManager.OnDrawButtonClicked` → `SetReadingResultScrollActive(true)` 후 `ExecuteTarotReadingFlowAsync`
 
-소형 로컬 모델은 프롬프트 규칙을 무시하고 마크다운·이모지·특수문자를 넣을 수 있습니다. `ExtractReadingResult` 안에서 **`SanitizeReadingText`**가 점괘 텍스트를 정리합니다.
+### 분기 (`TarotGameManager.ExecuteTarotReadingFlowAsync`)
 
-| 대상 | 처리 |
-|------|------|
-| `*`, `#`, `_`, `~`, `` ` `` | `string.Replace`로 제거 (마크다운) |
-| 이모지·기호·포맷 문자 | `SymbolAndEmojiPattern` Regex (`[\p{Cs}\p{So}\p{Cf}]`) |
-| 연속 공백 | 단일 공백으로 축소 |
+| 모드 | 핵심 호출 순서 |
+|------|----------------|
+| **데일리** `DailySingleCard` | `BeginReadingFlowPresentation` → `ShuffleAndDrawTwoCards` → `WaitForTwoCardSelectionAsync` → `RandomCardOrientation` → `BuildUserPrompt` → `RequestTarotReadingAsync` → `ExtractReadingResult` → `StripPastFutureSectionsForDailyReading` → `BuildReadingDisplayText` → `HideDefaultUI` / `ShowCardUiArea` → `TarotCardAnimator.ShowCardAsync` → `StreamReadingResultAsync` |
+| **스프레드** `SpreadPastPresentFuture` | `BeginReadingFlowPresentation` → `ShuffleAndDrawThreeCards` → `ShowCardUiArea` → **`WaitForSpreadCenterPlacementAsync`** (가운데 3장 → 과거·현재·미래 순으로 슬롯 배치; 슬롯 홀더 배경 `Image`는 카드가 들어가면 비활성화, `ResetSpreadPickCardsToCenter`·`HideSpreadThreeCardUi`에서 재활성화) → `BuildSpreadThreeCardPrompt` → `RequestTarotReadingAsync` → `ExtractReadingResult` → `TarotSpreadReadingParser.SplitSections` → `HideDefaultUI` / `ShowCardUiArea` / `BringReadingResultAreaToFront` → **`RunSpreadFlipAllAndShowResultAsync`** (세 슬롯 동시 뒤집기 → `AppendReadingResultText`로 과거/현재/미래 구절 누적, 스트리밍 없음) |
 
-- `\p{Cs}` — 서로게이트 쌍(U+10000 이상 이모지: 😀🌙💖 등).
-- `\p{So}` — BMP 기호 문자(☀✦♠☆□■ 등).
-- `\p{Cf}` — ZWJ·Variation Selector 등 보이지 않는 포맷 문자.
+- **리셋** `OnResetButtonClicked`: `HideSpreadThreeCardUi` (스프레드 슬롯 이름 TMP 비우기·슬롯 배경 이미지 복구 포함), `ClearConcernInput`, `ResetUI` → 다시 카테고리부터.
 
-> **주의**: 기존 `\U0001F000` 리터럴 이스케이프 방식은 Unity Mono에서 `ArgumentException`을 발생시킵니다. 유니코드 **카테고리 패턴**(`\p{...}`)은 Mono에서 정상 동작합니다.
+### 점괘 후처리 (`ExtractReadingResult`)
 
-새로운 특수문자가 빠져나오면 `SanitizeReadingText`의 `Replace` 체인에 한 줄 추가하면 됩니다.
+1. 응답이 프롬프트로 시작하면 해당 접두 제거  
+2. **`[점괘]`** (`ReadingSectionTag`) **마지막** 출현 이후만 사용 (`LastIndexOf`)  
+3. `StripStandaloneMetaTagLines` — 단독 줄 `[생각]` / `[점괘]` 제거  
+4. `StripEchoLabelLines` — `고민:`·`분야:` 등 **라벨+콜론** 형태 줄 제거(접두 문자열 배열; 스프레드 본문 보호를 위해 **`의미`는 에코 목록에 없음**)  
+5. 비어 있으면 실패 메시지  
+6. `SanitizeReadingText`(마크다운 문자·이모지류 Regex 1종) → `". "` → `".\n"`  
+
+**데일리 전용** (`StripPastFutureSectionsForDailyReading`): `[과거]`/`[미래]` 줄, `과거:`/`미래:` 헤더 줄 제거, 본문 맨 앞 `현재:` 접두 제거.
+
+**스프레드 구간** (`TarotSpreadReadingParser.SplitSections`): 각 `[과거]`·`[현재]`·`[미래]`를 **문서 내 순서와 무관하게** 찾아, 해당 태그 직후~다른 태그 직전까지 자름. 전각 `［］`·`【】`는 `[]`로 정규화. 태그로 아무것도 못 잡으면 `\n\n` 문단 3개 fallback. 구간별 `SanitizeSpreadSection`으로 슬롯 메타 접두 제거.
 
 ## 프롬프트 (`TarotPromptBuilder`)
 
-소형 로컬 모델용으로 최적화된 구조입니다.
+소형 온디바이스 모델 기준으로 **짧게** 유지합니다.
 
-- **시스템 프롬프트** — 4줄 핵심 지시만 포함: 역할 부여, `[생각]`/`[점괘]` 구조, "카드 이름을 꼭 언급하며 고민에 맞는 조언", 해요체, 한국어 전용, 이모지 금지.
-- **유저 프롬프트** — **인라인 few-shot 예시**를 먼저 보여준 뒤 `[실제 질문]` 섹션에 고민·카드·키워드·의미를 배치하고 `[생각]`으로 생성을 유도.
-- 카드 정보는 **한글 이름만** 유저 프롬프트에 포함(`NameEn` 제외).
+- **시스템** (`GetSystemPrompt`): 해요체, `[점괘]` 다음 본문, 질문란 반복 금지, 데일리 vs 스프레드 규칙 한 줄씩 — `TarotAIManager`에서 `LLMAgent.systemPrompt`에 1회 설정.
+- **데일리** `BuildUserPrompt`: `분야`/`고민`/`카드`/`의미` 나열 후 **`[점괘]`** 로 끝(예시 블록 없음).
+- **스프레드** `BuildSpreadThreeCardPrompt`: `과거`·`현재`·`미래` 줄 + `[점괘]` + 한 줄 답 형식 안내(`[과거]`…`[현재]`…`[미래]`).
 
-**설계 의도**: 소형 모델은 긴 규칙 나열보다 예시를 훨씬 잘 모방합니다. 규칙 9개를 4줄로 압축하고, 예시를 생성 직전에 배치하여 형식 추종률을 높였습니다.
+## LLM (`TarotAIManager`)
 
-## LLM 파라미터 (`TarotAIManager`)
+| 파라미터 | 값 |
+|----------|-----|
+| `temperature` | 0.5 |
+| `repeatPenalty` | 1.2 |
+| `topP` | 0.95 |
 
-| 파라미터 | 값 | 비고 |
-|----------|------|------|
-| `temperature` | 0.5 | 말투 안정화 (0.7에서 하향) |
-| `repeatPenalty` | 1.2 | 반복 방지 |
-| `topP` | 0.95 | 기본값 유지 |
-
-매 요청마다 `ClearHistory`를 호출하여 이전 대화 문맥이 간섭하지 않도록 합니다.
+`RequestTarotReadingAsync`: 히스토리 클리어 후 `Chat` (세부는 `TarotAIManager.cs`).
 
 ## 주요 클래스
 
 | 역할 | 파일 |
 |------|------|
-| 전체 플로우·후처리 | `Assets/Tarot/Scripts/TarotGameManager.cs` |
-| UI·가시성·스트리밍·ScrollRect | `Assets/Tarot/Scripts/UI/TarotUIManager.cs` |
+| 전체 플로우·분기·점괘 후처리 | `Assets/Tarot/Scripts/TarotGameManager.cs` |
+| UI·카테고리/모드/2장/3장·스트리밍·스크롤 표시 | `Assets/Tarot/Scripts/UI/TarotUIManager.cs` |
+| 3장 스프레드 프리팹/씬 패널 참조 바인딩 | `Assets/Tarot/Scripts/UI/TarotSpreadThreePanel.cs` |
+| 카드 등장·플립 (LitMotion) | `Assets/Tarot/Scripts/UI/TarotCardAnimator.cs` |
 | LLMUnity 초기화·채팅 | `Assets/Tarot/Scripts/Core/TarotAIManager.cs` |
 | 시스템/유저 프롬프트 | `Assets/Tarot/Scripts/Core/TarotPromptBuilder.cs` |
-| 카드 애니 (LitMotion) | `Assets/Tarot/Scripts/UI/TarotCardAnimator.cs` |
-| 카드 스프라이트 로드 | `Assets/Tarot/Scripts/Data/TarotCardResourceLoader.cs` |
-| 덱 | `Assets/Tarot/Scripts/Core/TarotDeckController.cs` |
-| 카드 데이터 | `Assets/Tarot/Scripts/Data/TarotCardDatabase.cs`, `TarotCardData.cs` |
+| 덱 셔플·2장/3장 뽑기 | `Assets/Tarot/Scripts/Core/TarotDeckController.cs` |
+| 스프레드 구절 분리 | `Assets/Tarot/Scripts/Core/TarotSpreadReadingParser.cs` |
+| 카드 스프라이트 | `Assets/Tarot/Scripts/Data/TarotCardResourceLoader.cs` |
+| 카드 DB·데이터 | `Assets/Tarot/Scripts/Data/TarotCardDatabase.cs`, `TarotCardData.cs` |
+| 고민 분야·리딩 모드·방향 | `TarotConcernCategory.cs`, `TarotReadingMode.cs`, `TarotCardOrientation.cs` |
 
-## UI 인스펙터 연결
+## 인스펙터 연결 (`TarotUIManager`)
 
-에디터에서 직렬화 필드 연결이 필요합니다. 누락 시 해당 기능만 스킵됩니다.
+**필수에 가까운 항목**
 
-- **`TarotUIManager`**: `_gameplayUiRoot`(선택), `_defaultUIText`, `_inputUiRoot`, `_concernInputField`, `_drawCardButton`, `_resetButton`, `_cardUiRoot`, `_cardNameText`, `_readingResultText`, 스크롤(선택): `_readingResultAreaRoot`, `_readingResultScrollRect`, `_readingResultScrollContent`.
-- **`TarotAIManager`**: `_uiManager`, `_llm`, `_llmAgent`.
-- **`TarotGameManager`**: `_aiManager`, `_uiManager`, `_cardAnimator`, `_resourceLoader`.
+- `_defaultUIText`, `_inputUiRoot`, `_concernInputField`, `_drawCardButton`, `_resetButton`, `_cardUiRoot`, `_cardNameText`, `_readingResultText`
 
-`UpdateCardNameUI`는 `선택된 카드:\n이름Kr (이름En)` 형식으로 표시합니다. 영문 표기를 빼려면 이 메서드를 수정하세요.
+**선택**
+
+- `_gameplayUiRoot`, 점괘 영역 `_readingResultAreaRoot`, `_readingResultScrollRect`, `_readingResultScrollContent`
+- **씬 제작 카테고리/모드 패널**: `_categorySelectionPanelRoot`, `_readingModeSelectionPanelRoot` — 지정 시 해당 루트를 쓰고 **런타임으로 패널을 만들지 않음**. 버튼은 `SubmitCategoryByEnumIndex(0~5)`, `SubmitReadingModeByEnumIndex(0=데일리, 1=스프레드)` 또는 `SubmitCategory` / `SubmitReadingMode` 로 연결.
+- **런타임 생성 시 부모(카테고리/모드/2장만)**: `_categoryPanelParentOverride`, `_readingModePanelParentOverride`, `_twoCardChoiceParentOverride`
+- **3장 스프레드 (필수)**: `_spreadThreeSceneInstance` **또는** `_spreadThreePanelPrefab` 중 하나 — 루트에 **`TarotSpreadThreePanel`** 컴포넌트, 인스펙터에서 가운데 카드×3·**슬롯 홀더**×3·이름 TMP×3 등 연결. **슬롯 배경을 끄려면** 각 `SlotCardHolder` **루트**에 `Image`가 있어야 함(`GetComponent<Image>`). 씬 인스턴스를 쓰면 프리팹 Instantiate 없음. 프리팹만 쓸 때 부모는 `_spreadThreeParentOverride` (비우면 `GameplayUiRoot` 또는 `TarotUIManager` 트랜스폼).
+- **카드 크기**: `_spreadSlotPreferredSize` — 가운데·슬롯에 옮긴 뒤에도 동일 `sizeDelta`로 맞춤. 스프레드 **루트** 위치·크기는 코드에서 바꾸지 않음 — 씬/프리팹에서 배치.
+
+**다른 매니저**
+
+- `TarotAIManager`: `_uiManager`, `_llm`, `_llmAgent`
+- `TarotGameManager`: `_aiManager`, `_uiManager`, `_cardAnimator`, `_resourceLoader`
 
 ## 패키지·빌드
 
-- **LLMUnity**: `ai.undream.llm` (Git).
-- **LitMotion** (+ Animation): Git URL.
-- **NuGet For Unity**: `com.github-glitchenzo.nugetforunity`; `Assets/Packages/`, `packages.config` 등.
-- **URP**: `com.unity.render-pipelines.universal`.
-- `.gitignore`에 `LLMUnityBuild/`, `Assets/Plugins/Android/LLMUnity/`, `Assets/StreamingAssets/LLMManager.json`, `*.gguf` 등이 제외되어 있음.
+- **LLMUnity** (`ai.undream.llm`)
+- **LitMotion** (+ 선택 `LitMotion.Animation`)
+- **TextMeshPro** (UI)
+- **URP** (`com.unity.render-pipelines.universal`)
+- **NuGetForUnity** — 레포에 포함(직접 쓰는 스크립트는 타로 코어와 무관할 수 있음)
+
+세부는 `Packages/manifest.json` 기준.
 
 ## 주의
 
-- **`FindObjectOfType`** 지양. 참조는 `SerializeField`/주입.
-- 점괘 추출은 **`[점괘]`** 태그가 모델 출력에 있어야 `ExtractReadingResult`와 맞습니다. 태그·프롬프트 변경 시 같이 맞출 것.
-- 이모지 후처리는 유니코드 **카테고리 패턴**(`\p{Cs}\p{So}\p{Cf}`)을 사용합니다. **`\U` 리터럴 이스케이프는 Unity Mono에서 크래시**하므로 사용 금지.
-- **씬 에셋(`.unity`) 자동 수정 전** 담당자 확인 필요.
+- **`FindObjectOfType`** 지양 — `SerializeField` 또는 주입.
+- 점괘 추출은 모델이 **`[점괘]`** 를 출력한다는 전제; 스프레드는 **`[과거]`/`[현재]`/`[미래]`** 출력과 `TarotSpreadReadingParser`·프롬프트를 맞출 것.
+- **`ResultReadingScroll`**: `UpdateReadingResultUI`만으로는 스크롤 루트가 켜지지 않음 — **뽑기 성공 시** `SetReadingResultScrollActive(true)`, 리셋/중단 시 끔.
+- UI 일부(카테고리·모드·2장)는 **참조가 비어 있으면** 코드에서 동적 생성. **3장 스프레드 UI는** `TarotSpreadThreePanel`이 있는 씬 인스턴스 또는 프리팹을 반드시 연결 — 미연결 시 에러 로그.
+- 스프레드 패널 **형제 순서**는 런타임에서 `SetAsFirstSibling` 등으로 바꾸지 않음(씬/프리팹 순서 유지).
+- 씬(`.unity`) 대량 자동 수정 전 담당자 확인 권장.
