@@ -139,6 +139,14 @@ namespace Tarot.UI
         private TextMeshProUGUI[] _spreadCardNameUnderTexts;
         private TaskCompletionSource<int> _spreadCenterClickTcs;
 
+        // 컬럼 루트(부채꼴)의 원본 위치/회전. 카드가 빠지면 남은 카드를 가운데로 재배치하고, 리셋 때 복원합니다.
+        private Vector2[] _spreadFanColPos;
+        private float[] _spreadFanColRotZ;
+        private const float SpreadRefanDuration = 0.22f;
+        private const float SpreadFanOutDuration = 0.42f;
+        private const float SpreadFanOutStagger = 0.05f;
+        private const float SpreadFanOutArcFactor = 0.18f;
+
         private GameObject _twoCardChoiceRoot;
         private Button _twoCardChoiceButtonLeft;
         private Button _twoCardChoiceButtonRight;
@@ -547,23 +555,12 @@ namespace Tarot.UI
         }
 
         /// <summary>
-        /// 점괘 텍스트 끝에 내용을 이어 붙입니다. (스프레드 순차 공개용)
+        /// 가운데 제시된 N장(뒷면) 중 사용자가 차례로 3장을 골라 과거→현재→미래 슬롯으로 옮깁니다.
+        /// 슬롯 인덱스(0=과거)별로 사용자가 고른 카드의 풀 인덱스를 반환합니다. 안 고른 카드는 센터 행과 함께 숨겨집니다.
         /// </summary>
-        public void AppendReadingResultText(string text)
+        public async Task<int[]> WaitForSpreadCenterPlacementAsync(Sprite cardBack, TarotCardData[] poolCards)
         {
-            if (_readingResultText == null || string.IsNullOrEmpty(text))
-                return;
-
-            _readingResultText.text += text;
-            RefreshReadingResultScrollLayout(false);
-        }
-
-        /// <summary>
-        /// 가운데 제시된 세 장을 과거→현재→미래 순으로 골라 각 슬롯으로 옮긴 뒤, 슬롯 인덱스(0=과거)별로 뽑은 카드의 덱 인덱스를 반환합니다.
-        /// </summary>
-        public async Task<int[]> WaitForSpreadCenterPlacementAsync(Sprite cardBack, TarotCardData[] threeCards)
-        {
-            if (threeCards == null || threeCards.Length < 3)
+            if (poolCards == null || poolCards.Length < 3)
                 return new[] { 0, 1, 2 };
 
             EnsureSpreadThreePanelBuilt();
@@ -575,39 +572,57 @@ namespace Tarot.UI
             if (_spreadThreeRoot != null)
                 _spreadThreeRoot.SetActive(true);
 
-            var placed = new bool[3];
-            var deckIndexForSlot = new int[3];
+            // 처음엔 가운데에 겹쳐 있다가 촤라락 펴지는 등장 모션.
+            await PlaySpreadFanOutAsync();
+
+            int pickCount = _spreadCenterPickRects.Length;
+            var placed = new bool[pickCount];
+            var pickIndexForSlot = new int[3];
             string[] pickMessages = { SpreadPickPastMessage, SpreadPickPresentMessage, SpreadPickFutureMessage };
 
             for (int step = 0; step < 3; step++)
             {
                 UpdateDefaultUIText(pickMessages[step]);
 
-                int deckIndex;
+                int pickIndex;
                 do
                 {
                     _spreadCenterClickTcs = new TaskCompletionSource<int>();
-                    deckIndex = await _spreadCenterClickTcs.Task;
-                } while (deckIndex < 0 || deckIndex > 2 || placed[deckIndex]);
+                    pickIndex = await _spreadCenterClickTcs.Task;
+                } while (pickIndex < 0 || pickIndex >= pickCount || placed[pickIndex]);
 
-                placed[deckIndex] = true;
-                deckIndexForSlot[step] = deckIndex;
+                placed[pickIndex] = true;
+                pickIndexForSlot[step] = pickIndex;
 
-                await AnimateSpreadCardIntoSlotAsync(_spreadCenterPickRects[deckIndex], _spreadSlotCardHolders[step]);
-                _spreadCenterPickButtons[deckIndex].interactable = false;
+                await AnimateSpreadCardIntoSlotAsync(_spreadCenterPickRects[pickIndex], _spreadSlotCardHolders[step]);
+                _spreadCenterPickButtons[pickIndex].interactable = false;
+
+                // 다음 선택이 남아 있으면, 빠진 자리를 메우도록 남은 카드를 가운데로 재배치.
+                if (step < 2)
+                    await ReFanRemainingCardsAsync(placed);
             }
 
             for (int s = 0; s < 3; s++)
             {
-                _spreadThreeImages[s] = _spreadCenterPickImages[deckIndexForSlot[s]];
-                _spreadThreeImageRects[s] = _spreadCenterPickRects[deckIndexForSlot[s]];
+                _spreadThreeImages[s] = _spreadCenterPickImages[pickIndexForSlot[s]];
+                _spreadThreeImageRects[s] = _spreadCenterPickRects[pickIndexForSlot[s]];
             }
 
             if (_spreadCenterRow != null)
                 _spreadCenterRow.SetActive(false);
 
             _spreadCenterClickTcs = null;
-            return deckIndexForSlot;
+            return pickIndexForSlot;
+        }
+
+        /// <summary>
+        /// 스프레드 센터에 깔 픽 카드 개수(N)를 반환합니다. 패널에 연결된 카드 수와 같습니다(기본 3 이상).
+        /// 게임 매니저가 이 개수만큼 덱에서 뽑아 넘기도록 맞추는 데 사용합니다.
+        /// </summary>
+        public int GetSpreadPickCardCount()
+        {
+            EnsureSpreadThreePanelBuilt();
+            return _spreadCenterPickImages?.Length ?? 3;
         }
 
         /// <summary>
@@ -631,7 +646,7 @@ namespace Tarot.UI
             ClearSpreadCardNameUnderTexts();
 
             SetReadingResultScrollActive(true);
-            UpdateReadingResultUI(string.IsNullOrEmpty(readingIntro) ? string.Empty : readingIntro + "\n\n");
+            UpdateReadingResultUI(string.Empty);
             BringReadingResultAreaToFront();
 
             if (_spreadThreeRoot != null)
@@ -647,23 +662,45 @@ namespace Tarot.UI
                 SetSpreadSlotCardNameUnder(i, cardsBySlot[i], orientationsBySlot[i]);
             RebuildSpreadCardNameLines(cardsBySlot, orientationsBySlot, nameRevealed);
 
-            string[] labels = { "과거", "현재", "미래" };
-            for (int i = 0; i < 3; i++)
+            string mergedReading = string.Empty;
+            if (sectionTexts != null)
             {
-                string piece = sectionTexts != null && i < sectionTexts.Length
-                    ? sectionTexts[i]?.Trim() ?? string.Empty
-                    : string.Empty;
-                if (string.IsNullOrWhiteSpace(piece))
-                    piece = "해석을 불러오지 못했어요. 다시 시도해 보세요.";
+                for (int i = 0; i < sectionTexts.Length; i++)
+                {
+                    string piece = sectionTexts[i]?.Trim() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(piece))
+                        continue;
 
-                AppendReadingResultText(labels[i] + "\n\n" + piece + "\n\n");
+                    mergedReading = string.IsNullOrEmpty(mergedReading)
+                        ? piece
+                        : mergedReading + " " + piece;
+                }
             }
+
+            if (string.IsNullOrWhiteSpace(mergedReading))
+                mergedReading = "해석을 불러오지 못했어요. 다시 시도해 보세요.";
+
+            // 1장과 동일하게 타이핑 효과로 표시(카드 뒤집힘 → 해석 스트리밍 순서 일치).
+            string introPrefix = string.IsNullOrEmpty(readingIntro) ? string.Empty : readingIntro + "\n\n";
+            await StreamReadingResultAsync(introPrefix + mergedReading);
         }
 
         private void ResetSpreadPickCardsToCenter(Sprite cardBack)
         {
-            for (int i = 0; i < 3; i++)
+            int pickCount = _spreadCenterPickRects.Length;
+            for (int i = 0; i < pickCount; i++)
             {
+                // 컬럼 루트를 원본 부채꼴 위치/회전으로 복원(이전 라운드 재배치 되돌림).
+                if (_spreadFanColPos != null && i < _spreadFanColPos.Length)
+                {
+                    RectTransform root = _spreadCenterPickColumnRoots[i];
+                    if (root != null)
+                    {
+                        root.anchoredPosition = _spreadFanColPos[i];
+                        root.localEulerAngles = new Vector3(0f, 0f, _spreadFanColRotZ[i]);
+                    }
+                }
+
                 RectTransform rt = _spreadCenterPickRects[i];
                 rt.SetParent(_spreadCenterPickColumnRoots[i], false);
                 rt.anchorMin = new Vector2(0.5f, 0.5f);
@@ -704,31 +741,174 @@ namespace Tarot.UI
 
         private async Task AnimateSpreadCardIntoSlotAsync(RectTransform cardRt, RectTransform slotHolder)
         {
+            // 선택 피드백: 살짝 키웠다 되돌리는 팝(탭 확인감).
+            await LMotion.Create(1f, 1.08f, 0.07f).WithEase(Ease.OutQuad)
+                .Bind(s => cardRt.localScale = new Vector3(s, s, 1f));
+            await LMotion.Create(1.08f, 1f, 0.05f).WithEase(Ease.InQuad)
+                .Bind(s => cardRt.localScale = new Vector3(s, s, 1f));
+
+            // 슬롯으로 부모를 옮기되 화면상 위치를 유지한 채 시작합니다.
             cardRt.SetParent(slotHolder, true);
-            float sx = cardRt.anchoredPosition.x;
-            float sy = cardRt.anchoredPosition.y;
+
+            Vector2 startPos = cardRt.anchoredPosition;
+            Vector2 startSize = cardRt.sizeDelta;
+            float startZ = Mathf.DeltaAngle(0f, cardRt.localEulerAngles.z); // -180~180 정규화(부채꼴 기울기)
+            Vector2 targetSize = new Vector2(_spreadSlotPreferredSize.x, _spreadSlotPreferredSize.y);
             float dur = SpreadCardMoveDuration;
-            await LMotion.Create(sx, 0f, dur).WithEase(Ease.InOutQuad).BindToAnchoredPositionX(cardRt);
-            await LMotion.Create(sy, 0f, dur).WithEase(Ease.InOutQuad).BindToAnchoredPositionY(cardRt);
+
+            // 위치(대각선)·회전(똑바로)·크기를 "동시에" 보간 — ㄱ자 이동과 기울어진 안착을 제거.
+            MotionHandle posHandle = LMotion.Create(startPos, Vector2.zero, dur)
+                .WithEase(Ease.OutCubic)
+                .Bind(p => cardRt.anchoredPosition = p);
+            MotionHandle rotHandle = LMotion.Create(startZ, 0f, dur)
+                .WithEase(Ease.OutCubic)
+                .Bind(z => cardRt.localEulerAngles = new Vector3(0f, 0f, z));
+            MotionHandle sizeHandle = LMotion.Create(startSize, targetSize, dur)
+                .WithEase(Ease.OutCubic)
+                .Bind(s => cardRt.sizeDelta = s);
+
+            await posHandle;
+            await rotHandle;
+            await sizeHandle;
+
+            // 최종 정렬 고정.
             cardRt.anchorMin = new Vector2(0.5f, 0.5f);
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
             cardRt.anchoredPosition = Vector2.zero;
-            cardRt.sizeDelta = new Vector2(_spreadSlotPreferredSize.x, _spreadSlotPreferredSize.y);
+            cardRt.localEulerAngles = Vector3.zero;
+            cardRt.sizeDelta = targetSize;
 
             Image holderBg = slotHolder.GetComponent<Image>();
             if (holderBg != null)
                 holderBg.enabled = false;
         }
 
-        private void OnSpreadCenterCardClicked(int deckIndex)
+        /// <summary>
+        /// 등장 연출: 모든 컬럼 루트를 가운데에 겹쳐 둔 뒤, 왼→오 스태거로 원본 부채꼴 위치/회전으로 펼칩니다.
+        /// </summary>
+        private async Task PlaySpreadFanOutAsync()
+        {
+            if (_spreadCenterPickColumnRoots == null || _spreadFanColPos == null)
+                return;
+
+            int n = _spreadCenterPickColumnRoots.Length;
+
+            // 시작점: 왼쪽 끝 슬롯(인덱스 0)에 전부 겹쳐 둠 — 첫 프레임은 왼쪽에 한 묶음.
+            Vector2 startPos = _spreadFanColPos.Length > 0 ? _spreadFanColPos[0] : Vector2.zero;
+            float startRotZ = _spreadFanColRotZ.Length > 0 ? Mathf.DeltaAngle(0f, _spreadFanColRotZ[0]) : 0f;
+
+            for (int i = 0; i < n; i++)
+            {
+                RectTransform root = _spreadCenterPickColumnRoots[i];
+                if (root == null)
+                    continue;
+                root.anchoredPosition = startPos;
+                root.localEulerAngles = new Vector3(0f, 0f, startRotZ);
+            }
+
+            MotionHandle last = default;
+            bool any = false;
+
+            for (int i = 0; i < n; i++)
+            {
+                RectTransform root = _spreadCenterPickColumnRoots[i];
+                if (root == null)
+                    continue;
+
+                Vector2 s = startPos;
+                Vector2 e = _spreadFanColPos[i];
+                float rs = startRotZ;
+                float re = Mathf.DeltaAngle(0f, _spreadFanColRotZ[i]);
+                float delay = i * SpreadFanOutStagger;
+
+                // 이동 거리에 비례한 호 높이 — 멀리 가는 바깥(오른쪽) 카드일수록 위로 더 크게 휘어 부채처럼.
+                float arc = Vector2.Distance(s, e) * SpreadFanOutArcFactor;
+                RectTransform r = root;
+
+                // 위치(호)와 회전을 진행값 t 하나로 함께 구동 — 직선 슬라이드 대신 곡선 스윕.
+                last = LMotion.Create(0f, 1f, SpreadFanOutDuration)
+                    .WithEase(Ease.OutCubic)
+                    .WithDelay(delay)
+                    .Bind(t =>
+                    {
+                        Vector2 p = Vector2.Lerp(s, e, t);
+                        p.y += arc * Mathf.Sin(Mathf.PI * t);
+                        r.anchoredPosition = p;
+                        r.localEulerAngles = new Vector3(0f, 0f, Mathf.Lerp(rs, re, t));
+                    });
+                any = true;
+            }
+
+            if (any)
+                await last;
+        }
+
+        /// <summary>
+        /// 아직 안 고른 카드들을 (왼→오 순서 유지하며) 원본 부채꼴의 가운데 K개 위치로 모아 빈자리를 메웁니다.
+        /// 모든 컬럼 루트를 동시에 보간하고 마지막 모션만 await합니다(동일 duration).
+        /// </summary>
+        private async Task ReFanRemainingCardsAsync(bool[] placed)
+        {
+            if (_spreadCenterPickColumnRoots == null || _spreadFanColPos == null || placed == null)
+                return;
+
+            int n = _spreadCenterPickColumnRoots.Length;
+
+            int k = 0;
+            for (int i = 0; i < n; i++)
+                if (!placed[i]) k++;
+            if (k == 0)
+                return;
+
+            int targetStart = (n - k) / 2;
+
+            int j = 0;
+            bool any = false;
+            MotionHandle lastPos = default;
+            MotionHandle lastRot = default;
+
+            for (int i = 0; i < n; i++)
+            {
+                if (placed[i])
+                    continue;
+
+                RectTransform root = _spreadCenterPickColumnRoots[i];
+                int slot = targetStart + j;
+                j++;
+                if (root == null || slot < 0 || slot >= n)
+                    continue;
+
+                Vector2 startPos = root.anchoredPosition;
+                Vector2 targetPos = _spreadFanColPos[slot];
+                float startRotZ = Mathf.DeltaAngle(0f, root.localEulerAngles.z);
+                float endRotZ = Mathf.DeltaAngle(0f, _spreadFanColRotZ[slot]);
+
+                lastPos = LMotion.Create(startPos, targetPos, SpreadRefanDuration)
+                    .WithEase(Ease.OutCubic)
+                    .Bind(p => root.anchoredPosition = p);
+                lastRot = LMotion.Create(startRotZ, endRotZ, SpreadRefanDuration)
+                    .WithEase(Ease.OutCubic)
+                    .Bind(z => root.localEulerAngles = new Vector3(0f, 0f, z));
+                any = true;
+            }
+
+            if (any)
+            {
+                await lastPos;
+                await lastRot;
+            }
+        }
+
+        private void OnSpreadCenterCardClicked(int pickIndex)
         {
             if (_spreadCenterClickTcs == null)
                 return;
-            if (deckIndex < 0 || deckIndex > 2)
+            int pickCount = _spreadCenterPickImages?.Length ?? 0;
+            if (pickIndex < 0 || pickIndex >= pickCount)
                 return;
 
-            _spreadCenterClickTcs.TrySetResult(deckIndex);
+            _spreadCenterClickTcs.TrySetResult(pickIndex);
         }
 
         /// <summary>
@@ -847,7 +1027,7 @@ namespace Tarot.UI
         {
             if (panel == null || !panel.ValidateBindings())
             {
-                Debug.LogError("[TarotUIManager] TarotSpreadThreePanel 참조가 비었습니다. 프리팹에서 Center Row, 카드×3, 슬롯×3, 이름 TMP×3를 연결해 주세요.");
+                Debug.LogError("[TarotUIManager] TarotSpreadThreePanel 참조가 비었습니다. 프리팹에서 Center Row, 픽 카드(3장 이상), 슬롯×3, 이름 TMP×3를 연결해 주세요.");
                 return;
             }
 
@@ -859,14 +1039,26 @@ namespace Tarot.UI
             _spreadSlotCardHolders = panel.SlotCardHolders;
             _spreadCardNameUnderTexts = panel.CardNameUnderTexts;
 
-            _spreadCenterPickRects = new RectTransform[3];
-            for (int i = 0; i < 3; i++)
+            // 픽 카드 개수(N)는 인스펙터에 연결된 만큼 사용합니다(3 이상). 슬롯·이름은 과거·현재·미래 3개 고정.
+            int pickCount = _spreadCenterPickImages.Length;
+            _spreadCenterPickRects = new RectTransform[pickCount];
+            for (int i = 0; i < pickCount; i++)
                 _spreadCenterPickRects[i] = _spreadCenterPickImages[i].rectTransform;
+
+            // 컬럼 루트의 원본 부채꼴 위치/회전을 저장(재배치·복원에 사용).
+            _spreadFanColPos = new Vector2[pickCount];
+            _spreadFanColRotZ = new float[pickCount];
+            for (int i = 0; i < pickCount; i++)
+            {
+                RectTransform root = _spreadCenterPickColumnRoots[i];
+                _spreadFanColPos[i] = root != null ? root.anchoredPosition : Vector2.zero;
+                _spreadFanColRotZ[i] = root != null ? root.localEulerAngles.z : 0f;
+            }
 
             _spreadThreeImages = new Image[3];
             _spreadThreeImageRects = new RectTransform[3];
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < pickCount; i++)
             {
                 int captured = i;
                 _spreadCenterPickButtons[i].onClick.RemoveAllListeners();

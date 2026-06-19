@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using UnityEngine;
 using LLMUnity;
+using Tarot.Data;
 using Tarot.UI;
 
 namespace Tarot.Core
@@ -17,6 +18,11 @@ namespace Tarot.Core
         [SerializeField] private LLM _llm;
         [SerializeField] private LLMAgent _llmAgent;
         private TarotPromptBuilder _promptBuilder;
+
+        // 출력 토큰 상한(numPredict): 1B 모델의 장황함을 하드 컷으로 막습니다.
+        // 한국어 기준 데일리 2~3문장 / 스프레드 3문장에 맞춘 여유값(필요 시 조절).
+        private const int DailyReadingMaxTokens = 160;
+        private const int SpreadReadingMaxTokens = 200;
 
         public bool IsReady { get; private set; } = false;
 
@@ -41,15 +47,15 @@ namespace Tarot.Core
             // 엔진 셋업 중 잘못된 호출 방지
             gameObject.SetActive(false);
 
-            _llmAgent.systemPrompt = _promptBuilder.GetSystemPrompt();
+            _llmAgent.systemPrompt = _promptBuilder.GetSystemPrompt(TarotReadingMode.DailySingleCard);
             
-            // LLM 파라미터 튜닝: 반복 현상 방지 및 더 자연스러운 생성 유도
-            // 너무 높으면 존대어/반말이 섞이므로 0.7에서 0.5로 하향 안정화
-            _llmAgent.temperature = 0.5f;
-            // repeatPenalty: 1.2로 유지 (반복 방지)
-            _llmAgent.repeatPenalty = 1.2f;
-            // topP: 0.95 유지
-            _llmAgent.topP = 0.95f;
+            // LLM 파라미터 튜닝: 장황함·뜬구름 완화
+            // temperature: 낮출수록 담백·일관(존대/반말 섞임도 함께 줄어듦)
+            _llmAgent.temperature = 0.35f;
+            // repeatPenalty: 1.2는 반복을 피하려 새 주제를 끌어와 답이 길어지는 부작용이 있어 1.1로 완화
+            _llmAgent.repeatPenalty = 1.1f;
+            // topP: 0.9로 약간 좁혀 표현이 흩어지는 것을 줄임
+            _llmAgent.topP = 0.9f;
 
             gameObject.SetActive(true);
 
@@ -75,7 +81,7 @@ namespace Tarot.Core
         /// </summary>
         /// <param name="userPrompt">조합이 완료된 사용자 질문 프롬프트</param>
         /// <returns>AI가 생성한 전체 답변 문자열</returns>
-        public async Task<string> RequestTarotReadingAsync(string userPrompt)
+        public async Task<string> RequestTarotReadingAsync(string userPrompt, TarotReadingMode mode)
         {
             if (!IsReady || _llmAgent == null)
             {
@@ -85,6 +91,10 @@ namespace Tarot.Core
 
             Debug.Log("[TarotAIManager] AI 추론 요청 전송...");
 
+            _llmAgent.systemPrompt = _promptBuilder.GetSystemPrompt(mode);
+            _llmAgent.numPredict = mode == TarotReadingMode.SpreadPastPresentFuture
+                ? SpreadReadingMaxTokens
+                : DailyReadingMaxTokens;
             await _llmAgent.ClearHistory();
 
             var tcs = new TaskCompletionSource<string>();

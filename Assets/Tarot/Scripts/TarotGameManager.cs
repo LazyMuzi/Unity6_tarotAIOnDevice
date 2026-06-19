@@ -29,6 +29,7 @@ namespace Tarot
         private const string ReadingSectionTag = "[점괘]";
         private const string ReadingOpeningFormat = "{0}카드가 나왔어요";
         private const string ReadingOpeningReversedFormat = "{0}카드가 역방향으로 나왔어요";
+        private const string SpreadOpeningLine = "세 장의 카드가 과거·현재·미래의 흐름을 보여줘요";
         private const string ReadingOpeningBodySeparator = "\n\n";
         /// <summary>이모지·특수 기호만 걷어낼 때 사용(한 패턴만 유지).</summary>
         private static readonly Regex SymbolAndEmojiPattern = new Regex(
@@ -39,7 +40,8 @@ namespace Tarot
         /// <summary>질문란 에코 줄 제거. "의미"는 스프레드 해석 본문에 자주 쓰이므로 넣지 않습니다.</summary>
         private static readonly string[] EchoLineLabelPrefixes =
         {
-            "고민", "분야", "카드", "키워드", "해석 지침", "방향", "리딩 종류", "카드 의미", "선택된 카드", "슬롯"
+            "고민", "분야", "카드", "키워드", "해석 지침", "방향", "리딩 종류", "카드 의미", "선택된 카드", "슬롯",
+            "본문", "조언", "결론", "요약"
         };
 
         [Header("Managers")]
@@ -60,6 +62,9 @@ namespace Tarot
 
         private void Start()
         {
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            Application.targetFrameRate = 60;
+
             _uiManager.SetReadingResultScrollActive(false);
             _uiManager.UpdateReadingResultUI("");
             _cardAnimator.Initialize(_resourceLoader.GetCardBackSprite());
@@ -157,7 +162,7 @@ namespace Tarot
             string prompt = _promptBuilder.BuildUserPrompt(concernCategory, userConcern, drawnCard, orientation);
             Debug.Log($"[TarotGameManager] 생성된 유저 프롬프트:\n{prompt}");
 
-            string rawReply = await _aiManager.RequestTarotReadingAsync(prompt);
+            string rawReply = await _aiManager.RequestTarotReadingAsync(prompt, TarotReadingMode.DailySingleCard);
             string readingResult = ExtractReadingResult(rawReply, prompt);
             readingResult = StripPastFutureSectionsForDailyReading(readingResult);
             readingResult = BuildReadingDisplayText(drawnCard.NameKr, readingResult, orientation);
@@ -181,8 +186,9 @@ namespace Tarot
 
             await Task.Delay(ShufflePresentationDelayMs);
 
-            TarotCardData[] three = _deckController.ShuffleAndDrawThreeCards();
-            if (three == null || three.Length < 3)
+            int pickCount = _uiManager.GetSpreadPickCardCount();
+            TarotCardData[] pool = _deckController.ShuffleAndDrawCards(pickCount);
+            if (pool == null || pool.Length < 3)
             {
                 _uiManager.UpdateDefaultUIText(DeckShuffleFailedMessage);
                 _uiManager.RestoreConcernInputAfterInterruptedFlow();
@@ -193,11 +199,11 @@ namespace Tarot
 
             int[] deckIndexForSlot = await _uiManager.WaitForSpreadCenterPlacementAsync(
                 _resourceLoader.GetCardBackSprite(),
-                three);
+                pool);
 
-            TarotCardData pastCard = three[deckIndexForSlot[0]];
-            TarotCardData presentCard = three[deckIndexForSlot[1]];
-            TarotCardData futureCard = three[deckIndexForSlot[2]];
+            TarotCardData pastCard = pool[deckIndexForSlot[0]];
+            TarotCardData presentCard = pool[deckIndexForSlot[1]];
+            TarotCardData futureCard = pool[deckIndexForSlot[2]];
 
             TarotCardOrientation oPast = RandomCardOrientation();
             TarotCardOrientation oPresent = RandomCardOrientation();
@@ -216,9 +222,13 @@ namespace Tarot
                 oFuture);
             Debug.Log($"[TarotGameManager] 스프레드 유저 프롬프트:\n{prompt}");
 
-            string rawReply = await _aiManager.RequestTarotReadingAsync(prompt);
+            string rawReply = await _aiManager.RequestTarotReadingAsync(prompt, TarotReadingMode.SpreadPastPresentFuture);
             string readingResult = ExtractReadingResult(rawReply, prompt);
-            string[] spreadSections = TarotSpreadReadingParser.SplitSections(readingResult);
+
+            // 1장과 동일하게 "오프닝 한 줄 + 본문 한 덩어리"로 표시한다.
+            // 카드 행이 이미 과거/현재/미래를 라벨링하므로 3구간 분리는 사용하지 않는다.
+            string spreadDisplay = BuildSpreadDisplayText(readingResult);
+            string[] spreadSections = { spreadDisplay, string.Empty, string.Empty };
 
             var fronts = new Sprite[3];
             fronts[0] = _resourceLoader.GetCardFrontSprite(pastCard.Id);
@@ -456,6 +466,18 @@ namespace Tarot
                 ? string.Format(ReadingOpeningReversedFormat, name)
                 : string.Format(ReadingOpeningFormat, name);
             return opening + ReadingOpeningBodySeparator + readingBody;
+        }
+
+        /// <summary>
+        /// 스프레드 본문 앞에 고정 오프닝 한 줄과 빈 줄 두 줄을 붙입니다.
+        /// (1장의 BuildReadingDisplayText와 대칭. 카드명은 카드 행에서 이미 표시되므로 반복하지 않습니다.)
+        /// </summary>
+        private static string BuildSpreadDisplayText(string readingBody)
+        {
+            if (string.IsNullOrWhiteSpace(readingBody))
+                return readingBody;
+
+            return SpreadOpeningLine + ReadingOpeningBodySeparator + readingBody.Trim();
         }
 
     }
