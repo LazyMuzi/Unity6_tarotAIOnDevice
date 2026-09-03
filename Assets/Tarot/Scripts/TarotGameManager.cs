@@ -36,12 +36,20 @@ namespace Tarot
             @"[\p{Cs}\p{So}\p{Cf}]",
             RegexOptions.Compiled);
 
-        /// <summary>모델이 질문란을 반복한 줄(고민: …)을 건너뛸 때 라벨 앞부분만 비교합니다.</summary>
-        /// <summary>질문란 에코 줄 제거. "의미"는 스프레드 해석 본문에 자주 쓰이므로 넣지 않습니다.</summary>
+        /// <summary>질문란 에코 줄(고민: … / 고민 = …)은 줄 전체를 제거합니다. 라벨 앞부분만 비교합니다.</summary>
+        private static readonly char[] EchoLabelSeparators = { ':', '：', '=' };
         private static readonly string[] EchoLineLabelPrefixes =
         {
-            "고민", "분야", "카드", "키워드", "해석 지침", "방향", "리딩 종류", "카드 의미", "선택된 카드", "슬롯",
-            "본문", "조언", "결론", "요약"
+            "고민", "분야", "카드", "키워드", "해석 지침", "방향", "리딩 종류", "선택된 카드", "슬롯"
+        };
+
+        /// <summary>
+        /// 해석 문장 앞에 붙는 구간 라벨(과거: …)은 라벨만 벗기고 문장은 남깁니다.
+        /// 1B 모델은 라벨을 금지해도 자주 붙이므로, 줄을 지우면 본문이 통째로 사라집니다.
+        /// </summary>
+        private static readonly string[] BodyLabelPrefixes =
+        {
+            "답", "과거", "현재", "미래", "지금", "점괘", "본문", "조언", "결론", "요약"
         };
 
         [Header("Managers")]
@@ -163,7 +171,8 @@ namespace Tarot
             Debug.Log($"[TarotGameManager] 생성된 유저 프롬프트:\n{prompt}");
 
             string rawReply = await _aiManager.RequestTarotReadingAsync(prompt, TarotReadingMode.DailySingleCard);
-            string readingResult = ExtractReadingResult(rawReply, prompt);
+            Debug.Log($"[TarotGameManager] AI 원문 응답:\n{rawReply}");
+            string readingResult = ExtractReadingResult(rawReply, prompt, userConcern);
             readingResult = StripPastFutureSectionsForDailyReading(readingResult);
             readingResult = BuildReadingDisplayText(drawnCard.NameKr, readingResult, orientation);
 
@@ -223,7 +232,8 @@ namespace Tarot
             Debug.Log($"[TarotGameManager] 스프레드 유저 프롬프트:\n{prompt}");
 
             string rawReply = await _aiManager.RequestTarotReadingAsync(prompt, TarotReadingMode.SpreadPastPresentFuture);
-            string readingResult = ExtractReadingResult(rawReply, prompt);
+            Debug.Log($"[TarotGameManager] AI 원문 응답:\n{rawReply}");
+            string readingResult = ExtractReadingResult(rawReply, prompt, userConcern);
 
             // 1장과 동일하게 "오프닝 한 줄 + 본문 한 덩어리"로 표시한다.
             // 카드 행이 이미 과거/현재/미래를 라벨링하므로 3구간 분리는 사용하지 않는다.
@@ -283,7 +293,7 @@ namespace Tarot
         /// <summary>
         /// AI 원본 응답에서 프롬프트 접두사와 [점괘] 태그를 제거하여 순수 결과만 추출합니다.
         /// </summary>
-        private string ExtractReadingResult(string rawReply, string prompt)
+        private string ExtractReadingResult(string rawReply, string prompt, string userConcern)
         {
             string result = rawReply;
 
@@ -298,8 +308,15 @@ namespace Tarot
                 result = result.Substring(readingIndex + ReadingSectionTag.Length).TrimStart();
             }
 
+            string beforeLabelStrip = result;
             result = StripStandaloneMetaTagLines(result);
             result = StripEchoLabelLines(result);
+
+            // 라벨 제거로 전부 지워졌다면 오류 대신 원문을 보여 주는 편이 낫다.
+            if (string.IsNullOrWhiteSpace(result))
+                result = beforeLabelStrip;
+
+            result = DropLeadingConcernRestatement(result, userConcern);
 
             if (string.IsNullOrWhiteSpace(result))
                 return ReadingParseFailedMessage;
@@ -329,7 +346,7 @@ namespace Tarot
             return string.Join("\n", kept).Trim();
         }
 
-        /// <summary>질문란 라벨로 시작하는 줄(고민: …) 제거 — Regex 없이 앞부분만 비교.</summary>
+        /// <summary>질문란 라벨 줄(고민: …)은 제거하고, 구간 라벨(과거: …)은 라벨만 벗깁니다 — Regex 없이 앞부분만 비교.</summary>
         private static string StripEchoLabelLines(string text)
         {
             if (string.IsNullOrEmpty(text))
@@ -341,10 +358,70 @@ namespace Tarot
             {
                 if (IsEchoLabelLine(line))
                     continue;
-                kept.Add(line);
+                kept.Add(StripBodyLabel(line));
             }
 
             return string.Join("\n", kept).Trim();
+        }
+
+        /// <summary>
+        /// "답:" 줄은 모델이 고민을 먼저 붙잡게 하는 장치라, 넷 중 하나쯤은 고민 문장을 그대로 되풀이한다.
+        /// 첫 줄이 고민의 되풀이면 화면에서만 뺀다(공백·문장부호를 뗀 뒤 포함 관계로 판정).
+        /// </summary>
+        private static string DropLeadingConcernRestatement(string text, string userConcern)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(userConcern))
+                return text;
+
+            int nl = text.IndexOf('\n');
+            string first = nl < 0 ? text : text.Substring(0, nl);
+            string a = CompactForCompare(first);
+            string b = CompactForCompare(userConcern);
+            if (a.Length == 0 || b.Length == 0)
+                return text;
+
+            bool restated = a.Contains(b) || b.Contains(a);
+            if (!restated)
+                return text;
+
+            return nl < 0 ? string.Empty : text.Substring(nl + 1).TrimStart();
+        }
+
+        private static string CompactForCompare(string s)
+        {
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c))
+                    sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        private static string StripBodyLabel(string line)
+        {
+            string t = TrimLeadingStars(line.Trim());
+            int sep = t.IndexOf(':');
+            if (sep < 0)
+                sep = t.IndexOf('：');
+            if (sep <= 0)
+                return line;
+
+            string label = TrimTrailingStars(t.Substring(0, sep).Trim());
+            foreach (string prefix in BodyLabelPrefixes)
+            {
+                if (label == prefix)
+                    return TrimLeadingStars(t.Substring(sep + 1).TrimStart());
+            }
+
+            return line;
+        }
+
+        private static string TrimTrailingStars(string t)
+        {
+            while (t.Length > 0 && t[t.Length - 1] == '*')
+                t = t.Substring(0, t.Length - 1).TrimEnd();
+            return t;
         }
 
         private static string TrimLeadingStars(string t)
@@ -357,9 +434,7 @@ namespace Tarot
         private static bool IsEchoLabelLine(string line)
         {
             string t = TrimLeadingStars(line.Trim());
-            int sep = t.IndexOf(':');
-            if (sep < 0)
-                sep = t.IndexOf('：');
+            int sep = t.IndexOfAny(EchoLabelSeparators);
             if (sep <= 0)
                 return false;
 
