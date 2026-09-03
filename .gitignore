@@ -113,3 +113,6 @@ LLMUnityBuild/
 
 # Local reference images for agents / docs (not part of the game build)
 .cursor/assets/
+
+# python
+__pycache__/
